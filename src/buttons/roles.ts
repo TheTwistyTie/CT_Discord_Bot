@@ -2,6 +2,55 @@ import { ButtonInteraction, GuildMemberRoleManager, Message, MessageActionRow, M
 import guildIdSchema from "../schema/guildId-schema";
 
 export default async (interaction: ButtonInteraction): Promise<void> => {
+    const rows = await makeRow(interaction.guild?.id)
+
+    const message = await interaction.reply({
+        content: 'What role would you like to set?',
+        components: rows,
+        ephemeral: true,
+        fetchReply: true
+    })
+
+    const collector = (message as Message).createMessageComponentCollector()
+
+    collector?.on('collect', async (i: ButtonInteraction) => {
+        const {customId, member} = i
+
+        if(customId == 'pronouns') {
+            setPronouns(i)
+        } else if (customId == 'region') {
+            setRegion(i)
+        } else {
+            let looseEnd = await i.reply({
+                content: 'Clicked.',
+                fetchReply: true
+            });
+    
+            (looseEnd as Message).delete();
+    
+            const prefix = '<@&';
+            const suffix = '>';
+    
+            const roles = (member?.roles as GuildMemberRoleManager)
+
+            if(roles.cache.has(customId)){
+                roles.remove(customId);
+                i.followUp({
+                    content: `Removed ${prefix}${customId}${suffix} successfully!`,
+                    ephemeral: true,
+                })
+            } else {
+                roles.add(customId);
+                i.followUp({
+                    content: `Added ${prefix}${customId}${suffix} successfully!`,
+                    ephemeral: true,
+                })
+            }
+        }
+    })
+}
+
+async function makeRow(guildId: any) : Promise<MessageActionRow[]> {
     const row = new MessageActionRow()
         .addComponents(
             new MessageButton()
@@ -15,26 +64,52 @@ export default async (interaction: ButtonInteraction): Promise<void> => {
                 .setStyle('PRIMARY')
         )
 
-    const message = await interaction.reply({
-        content: 'What role would you like to set?',
-        components: [row],
-        ephemeral: true,
-        fetchReply: true
-    })
+    let dbConnection = await guildIdSchema.findOne({guildId: guildId})
 
-    const collector = (message as Message).createMessageComponentCollector()
+    if(!dbConnection) {
+        return [row]
+    } else {
+        let numExtraRoles = 0;
+        let customRow = new MessageActionRow()
+        if(dbConnection.gameNight.use) {
+            customRow.addComponents(
+                new MessageButton()
+                    .setCustomId(dbConnection.gameNight.roleId)
+                    .setLabel('Game Nights')
+                    .setStyle('SECONDARY')
+            )
 
-    collector?.on('collect', (i: ButtonInteraction) => {
-        const {customId} = i
-        switch(customId){
-            case 'pronouns':
-                setPronouns(i)
-                break;
-            case 'region':
-                setRegion(i)
-                break;
+            numExtraRoles++;
         }
-    })
+
+        if(dbConnection.meetUps.use) {
+            customRow.addComponents(
+                new MessageButton()
+                    .setCustomId(dbConnection.meetUps.roleId)
+                    .setLabel('Meet Ups')
+                    .setStyle('SECONDARY')
+            )
+
+            numExtraRoles++;
+        }
+
+        if(dbConnection.events.use) {
+            customRow.addComponents(
+                new MessageButton()
+                    .setCustomId(dbConnection.events.roleId)
+                    .setLabel('Events')
+                    .setStyle('SECONDARY')
+            )
+
+            numExtraRoles++;
+        }
+
+        if(numExtraRoles > 0) {
+            return [row, customRow]
+        } else {
+            return [row]
+        }
+    }    
 }
 
 async function setPronouns(interaction: ButtonInteraction): Promise<void> {

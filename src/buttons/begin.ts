@@ -8,10 +8,12 @@ export default (interaction: ButtonInteraction): void => {
                 .setLabel('Set Roles')
                 .setStyle('PRIMARY'),
 
+                /*
             new MessageButton()
                 .setCustomId('resources')
                 .setLabel('Find Somewhere New')
                 .setStyle('PRIMARY')
+                */
         )
 
     interaction.reply({

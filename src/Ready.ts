@@ -22,7 +22,7 @@ export default (client: Client) => {
             console.log(err)
         })
 
-        const testingGuildId = '976198717961035796'
+        const testingGuildId = '979023303916265562'
         const testingGuild = client.guilds.cache.get(testingGuildId)
         let commands
     

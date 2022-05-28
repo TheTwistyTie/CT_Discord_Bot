@@ -25,6 +25,18 @@ const schema = new mongoose.Schema({
         type: String || undefined,
         required: true
     },
+    gameNight: {
+        roleId: String || undefined,
+        use: Boolean
+    },
+    meetUps: {
+        roleId: String || undefined,
+        use: Boolean
+    },
+    events: {
+        roleId: String || undefined,
+        use: Boolean
+    }
 })
 
 export default mongoose.model('guildId', schema)

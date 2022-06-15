@@ -10,7 +10,7 @@ export default (interaction: BaseCommandInteraction): void => {
         )
 
     interaction.reply({
-        content: '**Welcome to the Connecticut Discord Control Panel!**\nClick the button to begin.',
+        content: '**Welcome to the Control Panel!**\nClick the button to begin.',
         components: [row]
     })
 }

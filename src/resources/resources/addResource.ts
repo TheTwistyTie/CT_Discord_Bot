@@ -1,5 +1,7 @@
-import { ButtonInteraction, Guild, Message, MessageActionRow, MessageButton, MessageEmbed } from "discord.js"
-import resourceSchema from "src/schema/resource-schema"
+import { ButtonInteraction, Guild, Message, MessageActionRow, MessageButton, MessageEmbed, MessageSelectMenu, SelectMenuInteraction } from "discord.js"
+import resourceTypeSchema from "../../schema/resourceType-schema"
+import resourceSchema from "../../schema/resource-schema"
+import addType from "./addType"
 import ResourceData from "./ResourceData"
 
 export default async (interaction:ButtonInteraction) => {
@@ -32,7 +34,7 @@ export default async (interaction:ButtonInteraction) => {
             )
 
         const confMessage = await channel.send({
-            content: `We received ${resourceName.content}`,
+            content: `We received: '${resourceName.content}'`,
             components: [row]
         })
 
@@ -64,7 +66,7 @@ async function createResource(interaction: ButtonInteraction, name: string, guil
 
     const startMessage = await interaction.reply({
         content: `Tell us more about ${name}`,
-        embeds: [getEmbed(resourceData)],
+        embeds: [resourceData.BuildEmbed()],
         components: makeMessageActionRow(resourceData),
         fetchReply: true
     })
@@ -76,47 +78,14 @@ async function createResource(interaction: ButtonInteraction, name: string, guil
     })
 
     collector.on('collect', async (btnInt: ButtonInteraction) => {
-        switch(btnInt.customId) {
-            case 'change_name':
-                changeName(resourceData, btnInt, messageArray)
-                break;
-            case 'change_description':
-                changeDescription(resourceData, btnInt, messageArray)
-                break;
-            case 'add_url':
-                changeUrl(resourceData, btnInt, messageArray)
-                break;
-            case 'add_thumbnail':
-                changeThumbnail(resourceData, btnInt, messageArray)
-                break;
-            case 'add_image':
-                changeImage(resourceData, btnInt, messageArray)
-                break;
-            case 'submit':
-                submit(resourceData, btnInt, messageArray)
-                break;
-            case 'cancel':
-                messageArray.forEach(async message => {
-                    message.delete()
-                });
-
-                let loosend = await btnInt.reply({
-                    content: 'Canceled...',
-                    fetchReply: true
-                })
-
-                setTimeout(() => {}, 2000);
-
-                (loosend as Message).delete()
-                break;
-        }
+        Action(btnInt, resourceData, messageArray)
     })
 }
 
-async function createResourceRec(interaction: ButtonInteraction, resourceData: ResourceData, messageArray: Message[]) {
+export async function createResourceRec(interaction: ButtonInteraction, resourceData: ResourceData, messageArray: Message[]) {
     const startMessage = await interaction.reply({
         content: `Tell us more about ${resourceData.name}`,
-        embeds: [getEmbed(resourceData)],
+        embeds: [resourceData.BuildEmbed()],
         components: makeMessageActionRow(resourceData),
         fetchReply: true
     })
@@ -128,46 +97,51 @@ async function createResourceRec(interaction: ButtonInteraction, resourceData: R
     })
 
     collector.on('collect', async (btnInt: ButtonInteraction) => {
-        switch(btnInt.customId) {
-            case 'change_name':
-                changeName(resourceData, btnInt, messageArray)
-                break;
-            case 'change_description':
-                changeDescription(resourceData, btnInt, messageArray)
-                break;
-            case 'add_url':
-                changeUrl(resourceData, btnInt, messageArray)
-                break;
-            case 'add_thumbnail':
-                changeThumbnail(resourceData, btnInt, messageArray)
-                break;
-            case 'add_image':
-                changeImage(resourceData, btnInt, messageArray)
-                break;
-            case 'submit':
-                submit(resourceData, btnInt, messageArray)
-                break;
-            case 'cancel':
-                messageArray.forEach(async message => {
-                    message.delete()
-                });
-
-                let loosend = await btnInt.reply({
-                    content: 'Canceled...',
-                    fetchReply: true
-                })
-
-                setTimeout(() => {}, 2000);
-
-                (loosend as Message).delete()
-                break;
-        }
+        Action(btnInt, resourceData, messageArray)
     })
+}
+
+async function Action(btnInt: ButtonInteraction, resourceData: ResourceData, messageArray: Message[]) {
+    switch(btnInt.customId) {
+        case 'change_name':
+            changeName(resourceData, btnInt, messageArray)
+            break;
+        case 'change_description':
+            changeDescription(resourceData, btnInt, messageArray)
+            break;
+        case 'add_url':
+            changeUrl(resourceData, btnInt, messageArray)
+            break;
+        case 'add_thumbnail':
+            changeThumbnail(resourceData, btnInt, messageArray)
+            break;
+        case 'add_image':
+            changeImage(resourceData, btnInt, messageArray)
+            break;
+        case 'add_type':
+            addTypes(resourceData, btnInt, messageArray)
+            break;
+        case 'submit':
+            submit(resourceData, btnInt, messageArray)
+            break;
+        case 'cancel':
+            messageArray.forEach(async message => {
+                message.delete()
+            });
+
+            let loosend = await btnInt.reply({
+                content: 'Canceled...',
+                fetchReply: true
+            })
+
+            setTimeout(() => {}, 2000);
+
+            (loosend as Message).delete()
+            break;
+    }
 }
 
 function makeMessageActionRow(resourceData: ResourceData): MessageActionRow[] {
-    let allowSubmit = true
-
     let nameButton = new MessageButton()
         .setCustomId('change_name')
         .setLabel('Change Name')
@@ -184,14 +158,26 @@ function makeMessageActionRow(resourceData: ResourceData): MessageActionRow[] {
             .setLabel('Set the Description')
             .setCustomId('change_description')
             .setStyle('PRIMARY')
+    }
 
-        allowSubmit = false;
+    let typeButton
+    if(resourceData.HasType()){
+        typeButton = new MessageButton()
+            .setCustomId('add_type')
+            .setLabel('Add resource types')
+            .setStyle('SECONDARY')
+    } else {
+        typeButton = new MessageButton()
+            .setCustomId('add_type')
+            .setLabel('Add resource types')
+            .setStyle('PRIMARY')
     }
 
     const firstRow = new MessageActionRow()
         .addComponents(
             nameButton,
             descriptionButton,
+            typeButton,
         )
 
     let urlButton;
@@ -241,7 +227,7 @@ function makeMessageActionRow(resourceData: ResourceData): MessageActionRow[] {
         )
 
     let submitButton;
-    if(allowSubmit) {
+    if(resourceData.HasDescription() && resourceData.HasType()) {
         submitButton = new MessageButton()
             .setCustomId('submit')
             .setLabel('Submit')
@@ -268,26 +254,6 @@ function makeMessageActionRow(resourceData: ResourceData): MessageActionRow[] {
     return [firstRow, secondRow, finalRow]
 }
 
-function getEmbed(resourceData: ResourceData): MessageEmbed {
-    const embed = new MessageEmbed()
-        .setTitle(resourceData.name)
-        .setDescription(resourceData.description)
-
-    if(resourceData.HasImage()) {
-        embed.setImage(resourceData.image)
-    }
-
-    if(resourceData.HasThumbnail()) {
-        embed.setThumbnail(resourceData.thumbnail)
-    }
-
-    if(resourceData.HasUrl()) {
-        embed.setURL(resourceData.url)
-    }
-
-    return embed
-}
-
 async function changeName(resourceData: ResourceData, interaction: ButtonInteraction, messageArray: Message[]) {
     const { channel } = interaction;
 
@@ -305,7 +271,6 @@ async function changeName(resourceData: ResourceData, interaction: ButtonInterac
     nameCollector?.on('collect', async nameMsg => {
         
         const name = nameMsg.content;
-        messageArray.push(nameMsg)
 
         const row = new MessageActionRow()
             .addComponents(
@@ -367,7 +332,6 @@ async function changeDescription(resourceData: ResourceData, interaction: Button
     descriptionCollector?.on('collect', async descriptionMsg => {
         
         const description = descriptionMsg.content;
-        messageArray.push(descriptionMsg)
 
         const row = new MessageActionRow()
             .addComponents(
@@ -412,6 +376,91 @@ async function changeDescription(resourceData: ResourceData, interaction: Button
     })
 }
 
+async function addTypes(resourceData: ResourceData, interaction: ButtonInteraction, messageArray: Message[]) {
+    let resouceTypes = await resourceTypeSchema.findOne({guildId: resourceData.guildId})
+
+    let options = [{
+        label: 'Add new type of resource',
+        value: 'add_new'
+    }];
+    if(!resouceTypes) {
+        resouceTypes = new resourceTypeSchema({
+            guildId: resourceData.guildId,
+        })
+    } else {
+        for(let i = 0; i < resouceTypes.types.length; i++) {
+            options.push({
+                label: resouceTypes.types[i].name,
+                value: resouceTypes.types[i].name
+            })
+        }
+    }
+
+    const row = new MessageActionRow()
+        .addComponents(
+            new MessageSelectMenu()
+                .setCustomId('resource_type')
+                .setPlaceholder('Select what type of resource this is.')
+                .setOptions(options)
+                .setMinValues(1)
+        )
+
+    const resourceMsg = await interaction.reply({
+        content: 'What kind of resource is this?',
+        components: [row],
+        fetchReply: true
+    })
+
+    messageArray.push(resourceMsg as Message)
+
+    const typeCollector = (resourceMsg as Message).createMessageComponentCollector()
+
+    typeCollector.on('collect', async (selectInt: SelectMenuInteraction) => {
+        if(selectInt.values[0] == 'add_new') {
+            addType(selectInt, resourceData, messageArray)
+        } else {
+            let text = 'Received: '
+            selectInt.values.forEach(value => {
+                text += value + ', '
+            });
+
+            const row = new MessageActionRow()
+                .addComponents(
+                    new MessageButton()
+                        .setCustomId('continue')
+                        .setLabel('Continue')
+                        .setStyle('SUCCESS'),
+                    new MessageButton()
+                        .setCustomId('cancel')
+                        .setLabel('Cancel')
+                        .setStyle('DANGER')
+                )
+
+            let confMessage = await selectInt.reply({
+                content: text,
+                components: [row],
+                fetchReply: true
+            })
+
+            messageArray.push(confMessage as Message)
+
+            let collector = (confMessage as Message).createMessageComponentCollector({
+                max: 1
+            })
+
+            collector.on('collect', (btnInt: ButtonInteraction) => {
+                if(btnInt.customId == 'continue') {
+                    selectInt.values.forEach(value => {
+                        resourceData.SetType(value)
+                    });
+
+                    createResourceRec(btnInt, resourceData, messageArray)
+                }
+            })
+        }
+    })
+}
+
 async function changeUrl(resourceData: ResourceData, interaction: ButtonInteraction, messageArray: Message[]) {
     const { channel } = interaction;
 
@@ -429,7 +478,6 @@ async function changeUrl(resourceData: ResourceData, interaction: ButtonInteract
     urlCollector?.on('collect', async urlMsg => {
         let url = urlMsg.content;
         
-        messageArray.push(urlMsg)
 
         const row = new MessageActionRow()
             .addComponents(
@@ -491,7 +539,6 @@ async function changeThumbnail(resourceData: ResourceData, interaction: ButtonIn
         if(urlMsg.attachments.size == 0) {
 
         url = urlMsg.content;
-        messageArray.push(urlMsg)
 
         } else {
             url = urlMsg.attachments.first()?.url;
@@ -558,7 +605,6 @@ async function changeImage(resourceData: ResourceData, interaction: ButtonIntera
         if(urlMsg.attachments.size == 0) {
 
         url = urlMsg.content;
-        messageArray.push(urlMsg)
 
         } else {
             url = urlMsg.attachments.first()?.url;
@@ -624,7 +670,7 @@ async function submit(resourceData: ResourceData, interaction: ButtonInteraction
     const mainMsg = await interaction.reply({
         content: 'Are you sure that you want to submit this resource?',
         components: [row],
-        embeds: [buildEmbed(resourceData)],
+        embeds: [resourceData.BuildEmbed()],
         fetchReply: true,
     })
 
@@ -636,7 +682,7 @@ async function submit(resourceData: ResourceData, interaction: ButtonInteraction
 
     confConllector.on('collect',async (btnInt: ButtonInteraction) => {
         if(btnInt.customId === 'continue') {
-            btnInt.deferReply()
+            //btnInt.deferReply()
 
             const resources = await resourceSchema.find({guildId: resourceData.guildId})
 
@@ -655,7 +701,8 @@ async function submit(resourceData: ResourceData, interaction: ButtonInteraction
                         description: resourceData.description,
                         url: resourceData.url,
                         thumbnail: resourceData.thumbnail,
-                        image: resourceData.image
+                        image: resourceData.image,
+                        type: resourceData.GetTypeArray(),
                     }).save()
 
                     let loosend = await btnInt.reply({
@@ -663,10 +710,8 @@ async function submit(resourceData: ResourceData, interaction: ButtonInteraction
                         fetchReply: true
                     })
 
-                    setTimeout(() => {
-                        messageArray.forEach(message => {
-                            message.delete()
-                        }, 2000);
+                    messageArray.forEach(message => {
+                        message.delete()
                     });
 
                     (loosend as Message).delete()
@@ -731,24 +776,4 @@ async function submit(resourceData: ResourceData, interaction: ButtonInteraction
             (loosend as Message).delete()
         }
     })
-}
-
-function buildEmbed(resourceData: ResourceData): MessageEmbed {
-    const embed = new MessageEmbed()
-        .setTitle(resourceData.name)
-        .setDescription(resourceData.description)
-
-    if(resourceData.HasImage()){
-        embed.setImage(resourceData.image)
-    }
-
-    if(resourceData.HasThumbnail()){
-        embed.setThumbnail(resourceData.thumbnail)
-    }
-
-    if(resourceData.HasUrl()) {
-        embed.setURL(resourceData.url)
-    }
-
-    return embed
 }

@@ -25,6 +25,10 @@ const schema = new mongoose.Schema({
         type: String || undefined,
         required: false
     },
+    type: {
+        type: [],
+        required: true
+    },
     ratings: [
         {
             userId: String,

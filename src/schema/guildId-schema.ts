@@ -9,6 +9,14 @@ const schema = new mongoose.Schema({
         type: String || undefined,
         required: true
     },
+    moderator: {
+        type: String || undefined,
+        required: true
+    },
+    resourceAdder: {
+        type: String || undefined,
+        required: true
+    },
     heRoleId: {
         type: String || undefined,
         required: true
@@ -36,6 +44,11 @@ const schema = new mongoose.Schema({
     events: {
         roleId: String || undefined,
         use: Boolean
+    },
+    resources: {
+        resources: Boolean,
+        organizations: Boolean,
+        restaurants: Boolean,
     }
 })
 

@@ -6,19 +6,19 @@ export default async (interaction: ButtonInteraction): Promise<void> => {
     const row = new MessageActionRow()
     const findButton = new MessageButton()
     .setCustomId('find')
-    .setLabel('Find new restaurants!')
+    .setLabel('Find new organizations!')
     .setStyle('PRIMARY')
     
     let savedButton;
     if(await hasSaved(interaction.user)) {
         savedButton = new MessageButton()
         .setCustomId('saved')
-        .setLabel('View saved restaurants!')
+        .setLabel('View saved oragnaizations!')
         .setStyle('PRIMARY')
     } else {
         savedButton = new MessageButton()
         .setCustomId('saved')
-        .setLabel('View saved restaurants!')
+        .setLabel('View saved oragnizations!')
         .setStyle('SECONDARY')
         .setDisabled(true)
     }
@@ -33,7 +33,7 @@ export default async (interaction: ButtonInteraction): Promise<void> => {
         row.addComponents(
             new MessageButton()
                 .setCustomId('newResource')
-                .setLabel('Add new restaurant')
+                .setLabel('Add new organization')
                 .setStyle('PRIMARY')
         )
     }

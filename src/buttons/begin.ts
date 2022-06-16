@@ -20,22 +20,22 @@ async function makeRow(guildId: any) : Promise<MessageActionRow[]> {
                 .setStyle('PRIMARY'),
         )
 
-    const dbConnection = await guildIdSchema.findOne({guildId: guildId})
+    const configConnection = await guildIdSchema.findOne({guildId: guildId})
 
-    if(dbConnection) {
+    if(configConnection) {
         let resoUse = false;
         let orgUse = false;
         let restUse = false
 
-        if(dbConnection.resources.resources) {
+        if(configConnection.resources.resources) {
             resoUse = true
         }
 
-        if(dbConnection.resources.organizations) {
+        if(configConnection.resources.organizations) {
             orgUse = true
         }
 
-        if(dbConnection.resources.restaurants) {
+        if(configConnection.resources.restaurants) {
             restUse = true
         }
 

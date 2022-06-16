@@ -44,7 +44,7 @@ export default (client: Client) => {
 
         commands.create({
             name: 'setup',
-            description: 'Set up a new server to a defaulted template. Only run once!'
+            description: 'Set up a new server to a defaulted template.'
         })
     
         console.log(`${client.user.username} is ready`);

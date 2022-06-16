@@ -1,9 +1,8 @@
 import { ButtonInteraction, Guild, Message, MessageActionRow, MessageButton, MessageEmbed, TextChannel } from "discord.js";
 import ResourceData from "../../resources/resources/ResourceData";
 
-export default class MessageObject {
+export default class ResourceObject {
     data: ResourceData;
-    index: number;
     guild: Guild;
 
     message: any;
@@ -11,9 +10,8 @@ export default class MessageObject {
 
     viewFull: boolean
 
-    constructor(embedData: ResourceData, index: number, guild: Guild) {
+    constructor(embedData: ResourceData, guild: Guild) {
         this.data = embedData;
-        this.index = index;
         this.guild = guild;
 
         this.message = undefined

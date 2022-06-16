@@ -120,6 +120,20 @@ export default class ResourceData {
         return false
     }
 
+    HasTag(value: string): boolean {
+        let has = false;
+        let i = 0;
+
+        while(i<this.type.length && !has) {
+            if(this.type[i] == value) {
+                has = true;
+            }
+            i++
+        }
+
+        return has;
+    }
+
     GetType(): {name: string, value: string} {
         let label = 'Tags:'
 

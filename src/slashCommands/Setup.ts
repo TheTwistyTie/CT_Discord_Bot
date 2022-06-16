@@ -1,63 +1,64 @@
-import { ApplicationCommand, BaseCommandInteraction, ButtonInteraction, Message, MessageActionRow, MessageButton, MessageSelectMenu, SelectMenuInteraction } from "discord.js";
+import { ApplicationCommand, BaseCommandInteraction, ButtonInteraction, Guild, Message, MessageActionRow, MessageButton, MessageSelectMenu, SelectMenuInteraction } from "discord.js";
 import { existsSync, fstat, mkdirSync, readFile, readFileSync, writeFile, writeFileSync } from "fs";
+import regionSchema from "../schema/region-schema";
 import configSchema from "../schema/config-schema";
 import guildIdSchema from "../schema/guildId-schema";
 
 export default async (interaction: BaseCommandInteraction): Promise<void> => {
-    let dbConnection = await guildIdSchema.findOne({guildId: interaction.guild?.id})
+    if(!interaction.inCachedGuild()) return;
+
+    let dbConnection = await guildIdSchema.findOne({guildId: interaction.guild.id})
 
     if(!dbConnection) {
 
-        let moderatorRole = await interaction.guild?.roles.create({
+        let moderatorRole = await interaction.guild.roles.create({
             name: 'Moderator',
             color: 'BLURPLE'
         })
 
-        let resourceAdder = await interaction.guild?.roles.create({
+        let resourceAdder = await interaction.guild.roles.create({
             name: 'Resource Adder',
             color: 'AQUA'
         })
     
-        let heRole = await interaction.guild?.roles.create({
+        let heRole = await interaction.guild.roles.create({
             name: 'HE/HIM',
             color: 'DARK_PURPLE'
         })
 
-        let sheRole = await interaction.guild?.roles.create({
+        let sheRole = await interaction.guild.roles.create({
             name: 'SHE/HER',
             color: 'DARK_PURPLE'
         })
 
-        let theyRole = await interaction.guild?.roles.create({
+        let theyRole = await interaction.guild.roles.create({
             name: 'THEY/THEM',
             color: 'DARK_PURPLE'
         })
 
-        let otherRole = await interaction.guild?.roles.create({
+        let otherRole = await interaction.guild.roles.create({
             name: 'OTHER',
             color: 'DARK_PURPLE'
         })
 
-        let gameNight = await interaction.guild?.roles.create({
+        let gameNight = await interaction.guild.roles.create({
             name: 'Game Night',
             color: 'RANDOM'
         })
 
-        let meetUp = await interaction.guild?.roles.create({
+        let meetUp = await interaction.guild.roles.create({
             name: 'Meet Ups',
             color: 'RANDOM'
         })
 
-        let events = await interaction.guild?.roles.create({
+        let events = await interaction.guild.roles.create({
             name: 'Events',
             color: 'RANDOM'
         })
 
-        console.log(heRole?.id)
-
         dbConnection = await new guildIdSchema({
-            guildId: interaction.guild?.id,
-            guildName: interaction.guild?.name,
+            guildId: interaction.guild.id,
+            guildName: interaction.guild.name,
             moderator: moderatorRole?.id,
             resourceAdder: resourceAdder?.id,
             heRoleId: heRole?.id,
@@ -95,6 +96,11 @@ export default async (interaction: BaseCommandInteraction): Promise<void> => {
             new MessageButton()
                 .setCustomId('customResources')
                 .setLabel('Choose resources')
+                .setStyle('PRIMARY'),
+
+            new MessageButton()
+                .setCustomId('customRegions')
+                .setLabel('Set custom regions')
                 .setStyle('PRIMARY')
         )
 
@@ -114,6 +120,9 @@ export default async (interaction: BaseCommandInteraction): Promise<void> => {
                 break;
             case 'customResources':
                 resources(btnInt)
+                break;
+            case 'customRegions':
+                customRegion(btnInt)
                 break;
         }
     })
@@ -276,5 +285,151 @@ async function customRoles(interaction: ButtonInteraction) {
         selectInt.reply({
             content: content
         })
+    })
+}
+
+async function customRegion(interaction: ButtonInteraction) {
+    if(!interaction.inCachedGuild()) return;
+
+    let regionTypes = await regionSchema.findOne({guildId: interaction.guild.id})
+
+    let text = ''
+    let hasRegions = false;
+    if(!regionTypes){
+        text = 'You currently have no regions, would you like to add one?'
+    } else {
+        text = `You have ${regionTypes.regions.length} regions, would you like to view them or add more?`
+        hasRegions = true;
+    }
+
+    let row = new MessageActionRow()
+
+    let viewButton;
+    if(hasRegions) {
+        viewButton = new MessageButton()
+            .setCustomId('view')
+            .setLabel('View')
+            .setStyle('PRIMARY')
+    } else {
+        viewButton = new MessageButton()
+            .setCustomId('view')
+            .setLabel('View')
+            .setStyle('PRIMARY')
+            .setDisabled(true)
+    }
+
+    let addButton = new MessageButton()
+        .setCustomId('add')
+        .setLabel('Add')
+        .setStyle('PRIMARY')
+
+    row.addComponents(
+        viewButton,
+        addButton
+    )
+
+    let regionMsg = await interaction.reply({
+        content: text,
+        components: [row],
+        fetchReply: true
+    })
+
+    let collector = regionMsg.createMessageComponentCollector({max: 1})
+    collector.on('collect', async (regionBtnInt: ButtonInteraction) => {
+        switch(regionBtnInt.customId) {
+            case 'view':
+                viewRegions(regionBtnInt)
+                break;
+            case 'add':
+                createRegion(regionBtnInt)
+                break;
+        }
+    })
+}
+
+async function createRegion(interaction: ButtonInteraction) {
+    if(!interaction.inCachedGuild()) return;
+
+    let createRegionMessage = await interaction.reply({
+        content: 'What is the region called?',
+        fetchReply: true
+    });
+
+    let collector = interaction.channel?.createMessageCollector({max: 1})
+    collector?.on('collect', async (regionMessage) => {
+        let region = regionMessage.content;
+
+        const row = new MessageActionRow()
+            .addComponents(
+                new MessageButton()
+                    .setCustomId('continue')
+                    .setLabel('Continue')
+                    .setStyle('SUCCESS'),
+                new MessageButton()
+                    .setCustomId('cancel')
+                    .setLabel('Cancel')
+                    .setStyle('DANGER')
+            )
+
+        const btnMsg = await interaction.editReply({
+            content: `Recieved: ${region}`,
+            components: [row],
+        })
+
+        const confCollector = btnMsg.createMessageComponentCollector({
+            max: 1
+        })
+
+        confCollector.on('collect', async (confBtnInt: ButtonInteraction) => {
+            if(confBtnInt.customId === 'continue') {
+                interaction.editReply({
+                    content: 'Confimed',
+                    components: [],
+                })
+
+                let regionTypes = await regionSchema.findOne({guildId: interaction.guild.id}) 
+
+                if(!regionTypes) {
+                    regionTypes = new regionSchema({guildId: interaction.guild.id})
+                }
+
+                let regionRole = await interaction.guild.roles.create({
+                    name: region,
+                    color: 'GREEN'
+                })
+
+                regionTypes.regions.push({
+                    name: region,
+                    roleId: regionRole.id
+                })
+
+                regionTypes.save()
+
+            } else {
+                interaction.editReply({
+                    content: 'Canceled',
+                    components: [],
+                })
+            }
+        })
+    })
+}
+
+async function viewRegions(interaction: ButtonInteraction) {
+    if(!interaction.inCachedGuild()) return;
+
+    let regions = await regionSchema.findOne({guildId: interaction.guild.id})
+    let text = ''
+    if(regions.regions.length == 1) {
+        text = `You have one region:\n\t${regions.regions[0].name}`
+    } else {
+        text = `You hvae ${regions.regions.length} regions:\n`
+        for(let i = 0; i < regions.regions.length; i++){
+            text += `\t${regions.regions[i].name}\n`
+        }
+    }
+
+    interaction.reply({
+        content: text
     })
 }

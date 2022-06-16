@@ -629,7 +629,7 @@ async function changeImage(resourceData: ResourceData, interaction: ButtonIntera
 
         messageArray.push(btnMsg as Message)
 
-        const confCollector = await (btnMsg as Message).createMessageComponentCollector({
+        const confCollector = (btnMsg as Message).createMessageComponentCollector({
             max: 1,
         })
 
@@ -704,6 +704,14 @@ async function submit(resourceData: ResourceData, interaction: ButtonInteraction
                         image: resourceData.image,
                         type: resourceData.GetTypeArray(),
                     }).save()
+
+                    let resourceTypes = await resourceTypeSchema.findOne({guildId: resourceData.guildId})
+                    resourceData.GetTypeArray().forEach(type => {
+                        let resourceType = resourceTypes.types.findOne({name: type})
+                        resourceType.number++;
+                    });
+
+                    resourceTypes.save()
 
                     let loosend = await btnInt.reply({
                         content: 'Saved!',

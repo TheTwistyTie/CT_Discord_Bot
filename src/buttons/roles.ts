@@ -1,5 +1,6 @@
 import { ButtonInteraction, GuildMemberRoleManager, Message, MessageActionRow, MessageButton, MessageSelectMenu, SelectMenuInteraction } from "discord.js";
 import guildIdSchema from "../schema/guildId-schema";
+import regionSchema from "../schema/region-schema";
 
 export default async (interaction: ButtonInteraction): Promise<void> => {
     const rows = await makeRow(interaction.guild?.id)
@@ -57,12 +58,20 @@ async function makeRow(guildId: any) : Promise<MessageActionRow[]> {
                 .setCustomId('pronouns')
                 .setLabel('Pronous')
                 .setStyle('PRIMARY'),
-
-            new MessageButton()
-                .setCustomId('region')
-                .setLabel('Region')
-                .setStyle('PRIMARY')
         )
+
+    const regionConnection = await regionSchema.findOne({guildId: guildId})
+    
+    let regionButton;
+    if(regionConnection)
+    {
+        regionButton = new MessageButton()
+            .setCustomId('region')
+            .setLabel('Set Regions')
+            .setStyle('PRIMARY')
+
+        row.addComponents(regionButton)
+    }
 
     let dbConnection = await guildIdSchema.findOne({guildId: guildId})
 
@@ -210,57 +219,27 @@ async function setPronouns(interaction: ButtonInteraction): Promise<void> {
 }
 
 async function setRegion(interaction: ButtonInteraction): Promise<void> {
-    const RegionIds = [
-        '784933377824129025',
-        '784933731831382067',
-        '784933771127423027',
-        '784933814328623125',
-        '784933864678228008',
-        '784933902530773022',
-        '784933989361385482',
-        '784934029203341352'
-    ]
+    if(!interaction.inCachedGuild()) return;
+    let regionList = await regionSchema.findOne({guildId: interaction.guild.id})
+    let regionIds: string[] = []
+
+    let options = [];
+
+    for(let i = 0; i < regionList.regions.length; i++) {
+        regionIds.push(regionList.regions[i].roleId)
+
+        options.push({
+            label: `${regionList.regions[i].name}`,
+            value: regionList.regions[i].roleId
+        })
+    }
 
     const regionMessageComponent = new MessageActionRow()
         .addComponents(
             new MessageSelectMenu()
                 .setCustomId("region_select")
                 .setPlaceholder("Select a Region!")
-                .setOptions([
-                    {
-                        label: 'Fairfield County',
-                        value: '784933377824129025',
-                    },
-                    {
-                        label: "Hartford County",
-                        value: '784933731831382067',
-                    },
-                    {
-                        label: "Litchfield County",
-                        value: '784933771127423027',
-                    },
-                    {
-                        label: "Middlesex Country",
-                        value: '784933814328623125',
-                    },
-                    {
-                        label: "New Haven County",
-                        value: '784933864678228008',
-                    },
-                    {
-                        label: "New London County",
-                        value: '784933902530773022',
-                    },
-                    {
-                        label: "Tolland County",
-                        value: '784933989361385482',
-                    },
-                    {
-                        label: "Windham County",
-                        value: '784934029203341352'
-                    }
-                ]
-            ),
+                .setOptions(options),
         )
 
     const message = await interaction.reply({
@@ -280,7 +259,7 @@ async function setRegion(interaction: ButtonInteraction): Promise<void> {
         
         if(customId === 'region_select')
         {
-            RegionIds.forEach(id => {
+            regionIds.forEach(id => {
                 if(roles.cache.has(id)){
                     roles.remove(id);
                 }

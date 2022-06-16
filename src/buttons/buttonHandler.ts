@@ -14,6 +14,6 @@ export default (interaction: ButtonInteraction, commandName: string): void => {
             break;
         case 'resources':
             resources(interaction)
-            break            
+            break;
     }
 }

@@ -43,8 +43,7 @@ const schema = new mongoose.Schema({
     phoneNumber: String,
     address: String,
     email: String,
-    eligibility: String,
-    organization: String,
+    resources: [],
 })
 
-export default mongoose.model('resource', schema)
+export default mongoose.model('organization', schema)

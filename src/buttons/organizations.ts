@@ -1,4 +1,7 @@
 import { ButtonInteraction, Message, MessageActionRow, MessageButton, Role, RoleManager, User } from "discord.js"
+import savedOrganizations from "../pageHandler/Organizations/savedOrganizations"
+import findOrganizations from "../pageHandler/Organizations/findOrganizations"
+import addOrganization from "../resources/organizations/addOrganization"
 import guildIdSchema from "../schema/guildId-schema"
 import userSchema from "../schema/user-schema"
 
@@ -32,7 +35,7 @@ export default async (interaction: ButtonInteraction): Promise<void> => {
     if(addable) {
         row.addComponents(
             new MessageButton()
-                .setCustomId('newResource')
+                .setCustomId('add')
                 .setLabel('Add new organization')
                 .setStyle('PRIMARY')
         )
@@ -47,15 +50,25 @@ export default async (interaction: ButtonInteraction): Promise<void> => {
 
     const collector = (message as Message).createMessageComponentCollector()
 
-    collector?.on('collect', (i: ButtonInteraction) => {
+    collector?.on('collect', async (i: ButtonInteraction) => {
         const {customId} = i
+        let content = ''
         switch(customId){
             case 'find':
+                content = 'Finding Organizations!\nCheck your DM\'s'
+                findOrganizations(i)
                 break;
             case 'saved':
+                content = 'Viewing Saved Organizations!\nCheck your DM\'s'
+                savedOrganizations(i)
                 break;
             case 'add':
+                content = 'Adding an Organization!\nCheck your DM\'s'
+                addOrganization(i)
                 break;
+
+            let loosend = await i.reply({content: content, fetchReply: true})
+            setTimeout(() => {(loosend as Message).delete()}, 2000);
         }
     })
 }

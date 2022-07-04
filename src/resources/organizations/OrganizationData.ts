@@ -1,8 +1,8 @@
 import { ColorResolvable, MessageEmbed } from "discord.js";
 import { get } from "mongoose";
-import restaurantSchema from "../../schema/restaurant-schema";
+import organizationSchema from "../../schema/organization-schema";
 
-export default class RestaurantData {
+export default class OrganizatoinData {
     name: string;
     guildId: string;
     description: string = 'Default Description'
@@ -12,6 +12,7 @@ export default class RestaurantData {
 
     type: string[] = []
     region: string[] = []
+    resources: string[] = []
 
     ratings: [{
         userId: string,
@@ -64,6 +65,7 @@ export default class RestaurantData {
             userId: string,
             rating: number
         }],
+        resources: string[],
     }): void {
         this.name = data.name
         this.guildId = data.guildId
@@ -78,6 +80,7 @@ export default class RestaurantData {
         this.phoneNumber.value = data.phoneNumber
         this.address.value = data.address
         this.email.value = data.email
+        this.resources = data.resources
     }
 
     SetType(nType: string): void {
@@ -425,7 +428,7 @@ export default class RestaurantData {
             })
         }
 
-        let dbConnection = await restaurantSchema.findOne({name: this.name})
+        let dbConnection = await organizationSchema.findOne({name: this.name})
         if(dbConnection) {
             dbConnection.ratings = this.ratings;
             dbConnection.save()

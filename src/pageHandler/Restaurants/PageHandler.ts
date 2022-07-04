@@ -1,11 +1,12 @@
-import { ButtonInteraction, Message, MessageActionRow, MessageButton, TextChannel } from "discord.js"
+import { ButtonInteraction, DMChannel, Message, MessageActionRow, MessageButton, TextChannel } from "discord.js"
+import RestaurantObject from "./RestaurantObject";
 
-class PageHandler {
-    items = [];
-    channel: TextChannel;
+export default class PageHandler {
+    items: RestaurantObject[];
+    channel: DMChannel;
     userId: string;
 
-    constructor(items: any, channel: TextChannel, userId: string) {
+    constructor(items: RestaurantObject[], channel: DMChannel, userId: string) {
         this.items = items;
         this.channel = channel;
         this.userId = userId;
@@ -33,25 +34,29 @@ class PageHandler {
         }
 
         this.show()
+        setTimeout(() => {this.pageController()}, 2000)
     }
 
     clear(indexes: number[] | undefined): void {
         if(typeof indexes === 'undefined') {
             this.items.forEach(item => {
-                item //remove item here
+                item.removeMessage()
             });
         } else {
             indexes.forEach(index => {
-                this.items[index] //remove item here
+                this.items[index].removeMessage() //remove item here
             })
         }
-
+        
+        if(typeof this.pageMessage != 'undefined') {
+            this.pageMessage.delete()
+        }
         this.messageIndexes = []
     }
 
     show(): void {
         for(let i = 0; i < this.messageIndexes.length; i++) {
-            this.items[this.messageIndexes[i]] //Show message here
+            this.items[this.messageIndexes[i]].addMessage(this.channel, this.userId) //Show message here
         }
     }
 
@@ -106,7 +111,7 @@ class PageHandler {
                     break;
             }
 
-            this.pageController()
+            setTimeout(() => {this.pageController()}, 2000)
         })
     }
 

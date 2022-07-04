@@ -43,8 +43,6 @@ const schema = new mongoose.Schema({
     phoneNumber: String,
     address: String,
     email: String,
-    eligibility: String,
-    organization: String,
 })
 
-export default mongoose.model('resource', schema)
+export default mongoose.model('restaurant', schema)

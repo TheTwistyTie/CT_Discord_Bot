@@ -1,5 +1,6 @@
 import { ColorResolvable, MessageEmbed } from "discord.js";
 import { get } from "mongoose";
+import resourceSchema from "../../schema/resource-schema";
 
 export default class ResourceData {
     name: string;
@@ -10,11 +11,48 @@ export default class ResourceData {
     image: string = ''
 
     type: string[] = []
+    region: string[] = []
 
     ratings: [{
         userId: string,
         rating: number
     }] = [{userId: '0', rating: 3}]
+
+    openHours = {
+        name: 'Open Hours:',
+        value: 'unset',
+        inline: true,
+    }
+
+    phoneNumber = {
+        name: 'Phone Number:',
+        value: 'unset',
+        inline: true,
+    }
+
+    address = {
+        name: 'Address:',
+        value: 'unset',
+        inline: true,
+    }
+
+    email = {
+        name: 'Email:',
+        value: 'unset',
+        inline: false,
+    }
+
+    eligibility = {
+        name: 'Eligibility:',
+        value: 'unset',
+        inline: false,
+    }
+
+    organization = {
+        name: 'Organization:',
+        value: 'unset',
+        inline: true,
+    }
 
     constructor(name: string, guildId: string) {
         this.name = name;
@@ -29,10 +67,17 @@ export default class ResourceData {
         thumbnail: string,
         image: string,
         type: string[],
+        region: string[],
+        openHours: string,
+        phoneNumber: string,
+        address: string,
+        email: string,
+        eligibility: string,
         ratings: [{
             userId: string,
             rating: number
         }],
+        organization: string,
     }): void {
         this.name = data.name
         this.guildId = data.guildId
@@ -41,7 +86,14 @@ export default class ResourceData {
         this.thumbnail = data.thumbnail
         this.image = data.image
         this.type = data.type
+        this.region = data.region
         this.ratings = data.ratings
+        this.openHours.value = data.openHours
+        this.phoneNumber.value = data.phoneNumber
+        this.address.value = data.address
+        this.email.value = data.email
+        this.eligibility.value = data.eligibility
+        this.organization.value = data.organization
     }
 
     SetType(nType: string): void {
@@ -66,6 +118,30 @@ export default class ResourceData {
 
     SetTypeArray(values: string[]) {
         this.type = values
+    }
+
+    SetRegion(nRegion: string): void {
+        if(this.region.length == 0) {
+            this.region = [nRegion]
+        } else {
+            let i = 0;
+            let removed = false;
+            while(i<this.region.length) {
+                if(this.region[i] == nRegion) {
+                    this.region.splice(i,1)
+                    removed = true
+                }
+                i++
+            }
+
+            if(!removed) {
+                this.region.push(nRegion)
+            }
+        }
+    }
+
+    SetRegionArray(values: string[]) {
+        this.region = values
     }
 
     SetName(value: string): void {
@@ -93,8 +169,36 @@ export default class ResourceData {
 
     }
 
+    SetOpenHours(value: string): void {
+        this.openHours.value = value
+    }
+
+    SetPhoneNumber(value: string): void {
+        this.phoneNumber.value = value;
+    }
+
+    SetAddress(value: string): void {
+        this.address.value = value
+    }
+
+    SetEmail(value: string): void {
+        this.email.value = value;
+    }
+
+    SetEligibility(value: string): void {
+        this.eligibility.value = value
+    }
+
     SetImage(value: string): void {
         this.image = value
+    }
+
+    SetOrganization(value: string): void {
+        this.organization.value = value
+    }
+
+    AddRating(value: {userId: string, rating: number}): void {
+        this.ratings.push(value)
     }
 
     HasDescription(): boolean {
@@ -134,18 +238,80 @@ export default class ResourceData {
         return has;
     }
 
-    GetType(): {name: string, value: string} {
+    HasRegions(): boolean {
+        return (this.region.length >= 1)
+    }
+
+    HasRegion(value: string): boolean {
+        let has = false;
+        let i = 0;
+
+        while(i<this.region.length && !has) {
+            if(this.region[i] == value) {
+                has = true;
+            }
+            i++
+        }
+
+        return has;
+    }
+
+    HasOpenHours(): boolean {
+        if(this.openHours.value === 'unset' || typeof this.openHours.value == 'undefined') {
+            return false;
+        }
+        return true;
+    }
+
+    HasPhoneNumber(): boolean {
+        if(this.phoneNumber.value === 'unset' || typeof this.phoneNumber.value == 'undefined') {
+            return false;
+        }
+        return true;
+    }
+
+    HasAddress(): boolean {
+        if(this.address.value == 'unset' || typeof this.address.value == 'undefined') {
+            return false;
+        }
+        return true
+    }
+
+    HasEmail(): boolean {
+        if(this.email.value == 'unset'|| typeof this.email.value == 'undefined') {
+            return false
+        }
+        return true;
+    }
+
+    HasEligibility(): boolean {
+        if(this.eligibility.value == 'unset' || typeof this.eligibility.value == 'undefined') {
+            return false
+        }
+        return true;
+    }
+
+    HasOrganization(): boolean{
+        if(this.organization.value == 'unset' || typeof this.organization.value == 'undefined') {
+            return false
+        }
+        return true
+    }
+
+    GetType(): {name: string, value: string, inline: boolean} {
         let label = 'Tags:'
 
         if(this.type.length == 0) {
             return {
                 name: label,
-                value: 'untagged'
+                value: 'untagged',
+                inline: false
             }
         } else if (this.type.length == 1) {
             return {
                 name: label,
-                value: this.type[0]
+                value: this.type[0],
+                inline: true,
             }
         } else {
             let text = this.type[0]
@@ -158,13 +324,50 @@ export default class ResourceData {
 
             return {
                 name: label,
-                value: text
+                value: text,
+                inline: true,
             }
         }
     }
 
     GetTypeArray(): string[] {
         return this.type
+    }
+
+    GetRegion(): {name: string, value: string, inline: boolean} {
+        let label = 'Regions:'
+
+        if(this.region.length == 0) {
+            return {
+                name: label,
+                value: 'untagged',
+                inline: false
+            }
+        } else if (this.region.length == 1) {
+            return {
+                name: label,
+                value: this.region[0],
+                inline: true
+            }
+        } else {
+            let text = this.region[0]
+
+            let i = 1;
+            while(i<this.region.length) {
+                text += ', ' + this.region[i]
+                i++
+            }
+
+            return {
+                name: label,
+                value: text,
+                inline: true,
+            }
+        }
+    }
+
+    GetRegionArray(): string[] {
+        return this.region
     }
 
     BuildEmbed(): MessageEmbed {
@@ -185,14 +388,16 @@ export default class ResourceData {
             embed.setURL(this.url)
         }
 
-        let fields = []
         if(this.HasType()) {
-            //fields.push(this.GetType())
             embed.setFooter({text: this.GetType().value})
         }
 
     
         return embed
+    }
+
+    GetOrganization(): string {
+        return this.organization.value
     }
 
     BuildFullEmbed(): MessageEmbed {
@@ -216,12 +421,66 @@ export default class ResourceData {
         let fields = []
         if(this.HasType()) {
             fields.push(this.GetType())
-            //embed.setFooter({text: this.GetType().value})
+        }
+
+        if(this.HasRegions()) {
+            fields.push(this.GetRegion())
+        }
+
+        if(this.HasOpenHours()) {
+            fields.push(this.openHours)
+        }
+
+        if(this.HasPhoneNumber()) {
+            fields.push(this.phoneNumber)
+        }
+
+        if(this.HasAddress()) {
+            fields.push(this.address)
+        }
+
+        if(this.HasEmail()) {
+            fields.push(this.email)
+        }
+
+        if(this.HasEligibility()) {
+            fields.push(this.eligibility)
+        }
+
+        if(this.HasOrganization()) {
+            fields.push(this.organization)
         }
 
         embed.addFields(fields)
     
         return embed
+    }
+
+    async rate(userId: string, rating: number) {
+        let i = 0;
+        let found = false
+        
+        while(i < this.ratings.length && !found) {
+            if(this.ratings[i].userId == userId) {
+                found = true;
+                this.ratings[i].rating = rating
+            }
+            i++
+        }
+
+        if(!found) {
+            this.ratings.push({
+                userId: userId,
+                rating: rating
+            })
+        }
+
+        let dbConnection = await resourceSchema.findOne({name: this.name})
+        if(dbConnection) {
+            dbConnection.ratings = this.ratings;
+            dbConnection.save()
+        }
+        
     }
 
     validURL(string: string) {
@@ -236,13 +495,17 @@ export default class ResourceData {
     }
 
     getColor(): ColorResolvable {
-        let numRatings = 0
-        let rating = 0
+        let numRatings: number = 0
+        let rating: number = 0
+
         while(numRatings < this.ratings.length) {
             rating += this.ratings[numRatings].rating
             numRatings++
         }
         rating = rating/numRatings
+        if(numRatings == 0) {
+            rating = 3;
+        }
 
         const red = '#FF0000'
         const yellow = '#FFFF00'
@@ -250,8 +513,6 @@ export default class ResourceData {
         const grey = '#808080'
 
         let ratingPercent = (rating / 5.0) - 0.1
-
-        return '#808080'
 
         let ratingColor
         if(ratingPercent < 0.5) {
@@ -266,11 +527,10 @@ export default class ResourceData {
             ratingColor = this.blendColors(grey, ratingColor, geryblend)
         }
 
-        return ratingColor
+        return ratingColor as ColorResolvable
     }
 
     blendColors = (color1: string, color2: string, percentage: number): string => {
-    
         let color1RGB = [parseInt(color1[1] + color1[2], 16), parseInt(color1[3] + color1[4], 16), parseInt(color1[5] + color1[6], 16)];
         let color2RGB = [parseInt(color2[1] + color2[2], 16), parseInt(color2[3] + color2[4], 16), parseInt(color2[5] + color2[6], 16)];
     

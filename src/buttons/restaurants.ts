@@ -1,13 +1,16 @@
 import { ButtonInteraction, Message, MessageActionRow, MessageButton, Role, RoleManager, User } from "discord.js"
+import findRestaurants from "../pageHandler/Restaurants/findRestaurants"
+import savedRestaurants from "../pageHandler/Restaurants/savedRestaurants"
+import addRestaurant from "../resources/restaurants/addRestaurant"
 import guildIdSchema from "../schema/guildId-schema"
 import userSchema from "../schema/user-schema"
 
 export default async (interaction: ButtonInteraction): Promise<void> => {
     const row = new MessageActionRow()
     const findButton = new MessageButton()
-    .setCustomId('find')
-    .setLabel('Find new restaurants!')
-    .setStyle('PRIMARY')
+        .setCustomId('find')
+        .setLabel('Find new restaurants!')
+        .setStyle('PRIMARY')
     
     let savedButton;
     if(await hasSaved(interaction.user)) {
@@ -32,7 +35,7 @@ export default async (interaction: ButtonInteraction): Promise<void> => {
     if(addable) {
         row.addComponents(
             new MessageButton()
-                .setCustomId('newResource')
+                .setCustomId('add')
                 .setLabel('Add new restaurant')
                 .setStyle('PRIMARY')
         )
@@ -47,16 +50,26 @@ export default async (interaction: ButtonInteraction): Promise<void> => {
 
     const collector = (message as Message).createMessageComponentCollector()
 
-    collector?.on('collect', (i: ButtonInteraction) => {
+    collector?.on('collect', async (i: ButtonInteraction) => {
         const {customId} = i
+        let content = 'Clicked.'
         switch(customId){
             case 'find':
+                content = 'Finding Restaurants!\nCheck your DM\'s'
+                findRestaurants(i)
                 break;
             case 'saved':
+                content = 'Viewing Saved Restaurants!\nCheck your DM\'s'
+                savedRestaurants(i)
                 break;
             case 'add':
+                content = 'Adding Restaurant!\nCheck your DM\'s'
+                addRestaurant(i)
                 break;
         }
+        
+        let loosend = await i.reply({content: content, fetchReply: true})
+        setTimeout(() => {(loosend as Message).delete()}, 2000);
     })
 }
 
@@ -69,7 +82,7 @@ async function hasSaved(user: User) {
         })
     }
 
-    if(userData.savedResources.length > 0) {
+    if(userData.savedRestaurants.length > 0) {
         return true;
     } else {
         return false;

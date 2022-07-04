@@ -1,4 +1,6 @@
 import { ButtonInteraction, Message, MessageActionRow, MessageButton, Role, RoleManager, User } from "discord.js"
+import savedResources from "../pageHandler/Resources/savedResources"
+import findResources from "../pageHandler/Resources/findResources"
 import addResource from "../resources/resources/addResource"
 import guildIdSchema from "../schema/guildId-schema"
 import userSchema from "../schema/user-schema"
@@ -6,9 +8,9 @@ import userSchema from "../schema/user-schema"
 export default async (interaction: ButtonInteraction): Promise<void> => {
     const row = new MessageActionRow()
     const findButton = new MessageButton()
-    .setCustomId('find')
-    .setLabel('Find new resources!')
-    .setStyle('PRIMARY')
+        .setCustomId('find')
+        .setLabel('Find new resources!')
+        .setStyle('PRIMARY')
     
     let savedButton;
     if(await hasSaved(interaction.user)) {
@@ -48,17 +50,27 @@ export default async (interaction: ButtonInteraction): Promise<void> => {
 
     const collector = (message as Message).createMessageComponentCollector()
 
-    collector?.on('collect', (i: ButtonInteraction) => {
+    collector?.on('collect', async (i: ButtonInteraction) => {
         const {customId} = i
+        let content = ''
         switch(customId){
             case 'find':
+                findResources(i);
+                content = 'Finding Resources!\nCheck your DM\'s'
                 break;
             case 'saved':
+                savedResources(i);
+                content = 'Viewing Saved Resources!\nCheck your DM\'s'
                 break;
             case 'add':
                 addResource(i)
+                content = 'Adding Resource!\nCheck your DM\'s'
                 break;
         }
+
+        let loosend = await i.reply({content: content, fetchReply: true})
+        setTimeout(() => {(loosend as Message).delete()}, 2000);
+        
     })
 }
 

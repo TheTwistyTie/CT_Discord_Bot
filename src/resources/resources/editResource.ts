@@ -7,82 +7,13 @@ import regionSchema from "../../schema/region-schema"
 import guildIdSchema from "../../schema/guildId-schema"
 import organizationSchema from "../../schema/organization-schema"
 
-export default async (interaction:ButtonInteraction) => {
-    const {guild, user} = interaction
-    const guildId = guild?.id || ''
+let originalData: ResourceData
 
-    const initialMessage = await user.send({
-        content: 'Thanks for adding something to our system!\nWhat is the name?',
-    })
+export default async (interaction:ButtonInteraction, resourceData: ResourceData) => {
+    originalData = resourceData;
 
-    const channel = initialMessage.channel;
-
-    const nameCollector = await channel.createMessageCollector({
-        max: 1,
-        time: 60000
-    })
-
-    nameCollector.on('collect',async (resourceName: Message) => {
-        const row = new MessageActionRow()
-            .addComponents(
-                new MessageButton()
-                    .setCustomId('confirm')
-                    .setLabel('Confirm')
-                    .setStyle('SUCCESS'),
-
-                new MessageButton()
-                    .setCustomId('cancel')
-                    .setLabel('Cancel')
-                    .setStyle('DANGER')
-            )
-
-        const confMessage = await channel.send({
-            content: `We received: '${resourceName.content}'`,
-            components: [row]
-        })
-
-        const confCollector = confMessage.createMessageComponentCollector()
-
-        confCollector.on('collect', async (btnInt: ButtonInteraction) => {
-            if(btnInt.customId === 'confirm') {
-                createResource(btnInt, resourceName.content, guildId)
-            } else {
-                let looseEnd = await btnInt.reply({
-                    content: 'Cancled.',
-                    fetchReply: true
-                })
-
-                setTimeout(() => {}, 2000);
-
-                (looseEnd as Message).delete()
-            }
-
-            confMessage.delete();
-            initialMessage.delete();
-        })
-    })
-}
-
-async function createResource(interaction: ButtonInteraction, name: string, guild: string) {
-    const resourceData = new ResourceData(name, guild);
-    const messageArray: Message[] = []
-
-    const startMessage = await interaction.reply({
-        content: `Tell us more about ${name}`,
-        embeds: [resourceData.BuildFullEmbed()],
-        components: await makeMessageActionRow(resourceData),
-        fetchReply: true
-    })
-
-    messageArray.push(startMessage as Message)
-
-    const collector = (startMessage as Message).createMessageComponentCollector({
-        max: 1
-    })
-
-    collector.on('collect', async (btnInt: ButtonInteraction) => {
-        Action(btnInt, resourceData, messageArray)
-    })
+    let messageArray: Message[] = []
+    createResourceRec(interaction, resourceData, messageArray)
 }
 
 export async function createResourceRec(interaction: ButtonInteraction, resourceData: ResourceData, messageArray: Message[]) {
@@ -148,6 +79,9 @@ async function Action(btnInt: ButtonInteraction, resourceData: ResourceData, mes
         case 'submit':
             submit(resourceData, btnInt, messageArray)
             break;
+        case 'delete':
+            deleteResource(resourceData, btnInt, messageArray)
+            break;
         case 'cancel':
             messageArray.forEach(async message => {
                 message.delete()
@@ -184,6 +118,7 @@ async function makeMessageActionRow(resourceData: ResourceData): Promise<Message
         .setCustomId('change_name')
         .setLabel('Change Name')
         .setStyle('SECONDARY')
+        .setDisabled(true)
 
     let descriptionButton;
     if(resourceData.HasDescription()){
@@ -204,11 +139,13 @@ async function makeMessageActionRow(resourceData: ResourceData): Promise<Message
             .setCustomId('add_type')
             .setLabel('Add resource types')
             .setStyle('SECONDARY')
+            .setDisabled(true)
     } else {
         typeButton = new MessageButton()
             .setCustomId('add_type')
             .setLabel('Add resource types')
             .setStyle('PRIMARY')
+            .setDisabled(true)
     }
 
     let regionButton
@@ -217,11 +154,13 @@ async function makeMessageActionRow(resourceData: ResourceData): Promise<Message
             .setCustomId('add_region')
             .setLabel('Add resource regions')
             .setStyle('SECONDARY')
+            .setDisabled(true)
     } else {
         regionButton = new MessageButton()
             .setCustomId('add_region')
             .setLabel('Add resource regions')
             .setStyle('PRIMARY')
+            .setDisabled(true)
     }
 
     const firstRow = new MessageActionRow
@@ -378,9 +317,15 @@ async function makeMessageActionRow(resourceData: ResourceData): Promise<Message
         .setLabel('Cancel')
         .setStyle('DANGER')
 
+    const deleteButton = new MessageButton()
+        .setCustomId('delete')
+        .setLabel('Delete Resource')
+        .setStyle('DANGER')
+
     const finalRow = new MessageActionRow()
         .addComponents(
             submitButton,
+            deleteButton,
             cancelButton
         )
 
@@ -1277,6 +1222,77 @@ async function addOrganization(resourceData: ResourceData, interaction: ButtonIn
     })
 }
 
+async function deleteResource(resourceData: ResourceData, interaction: ButtonInteraction, messageArray: Message[]) {
+    const { channel } = interaction
+
+    const row = new MessageActionRow()
+        .addComponents(
+            new MessageButton()
+                .setCustomId('cancel')
+                .setLabel('Cancel')
+                .setStyle('SECONDARY'),
+            new MessageButton()
+                .setCustomId('deleteResource')
+                .setLabel('Delete')
+                .setStyle('DANGER')
+        )
+
+    const mainMsg = await interaction.reply({
+        content: 'Are you sure that you want to delete this resource?',
+        components: [row],
+        embeds: [resourceData.BuildFullEmbed()],
+        fetchReply: true,
+    })
+
+    messageArray.push(mainMsg as Message)
+
+    const confConllector = (mainMsg as Message).createMessageComponentCollector({
+        max: 1,
+    })
+
+    confConllector.on('collect',async (btnInt: ButtonInteraction) => {
+        let text = ''
+        if(btnInt.customId === 'deleteResource') {
+            const resources = await resourceSchema.find({guildId: resourceData.guildId})
+
+            if(resources) {
+                console.log('found resources.')
+                for(let i = 0; i < resources.length; i++) {
+                    if(resources[i].name == resourceData.name) {
+                        resources[i].delete()
+                    }
+                }
+
+                if(resourceData.HasOrganization()) {
+                    console.log('deleteing resource refrence from organization.')
+                    let organization = await organizationSchema.findOne({name: resourceData.organization.value})
+                    for(let i = 0; i < organization.resources.length; i++) {
+                        if(organization.resources[i] == resourceData.name) {
+                            organization.resources.splice(i, 1)
+                        }
+                    }
+
+                    organization.save()
+                }
+            }
+            text = 'Deleted.'
+
+            
+        } else {
+            text = 'Cancled.'
+        }
+
+        let looseEnd = await btnInt.reply({
+            content: text,
+            fetchReply: true
+        })
+
+        setTimeout(() => {
+            (looseEnd as Message).delete()
+        }, 2000)
+    })
+}
+
 async function submit(resourceData: ResourceData, interaction: ButtonInteraction, messageArray: Message[]) {
     const { channel } = interaction
 
@@ -1312,52 +1328,39 @@ async function submit(resourceData: ResourceData, interaction: ButtonInteraction
             const resources = await resourceSchema.find({guildId: resourceData.guildId})
 
             if(resources) {
-                let duplicate = false
-                resources.forEach(resource => {
-                    if(resource.name == resourceData.name) {
-                        duplicate = true;
+                for(let i = 0; i < resources.length; i++) {
+                    if(resources[i].name == resourceData.name) {
+                        resources.splice(i, 1)
                     }
-                });
+                }
+                
+                let newResource = new resourceSchema({
+                    guildId: resourceData.guildId,
+                    name: resourceData.name,
+                    description: resourceData.description,
+                    url: resourceData.url,
+                    thumbnail: resourceData.thumbnail,
+                    image: resourceData.image,
+                    type: resourceData.GetTypeArray(),
+                    region: resourceData.GetRegionArray(),
+                    openHours: resourceData.openHours.value,
+                    phoneNumber: resourceData.phoneNumber.value,
+                    address: resourceData.address.value,
+                    email: resourceData.email.value,
+                    eligibility: resourceData.eligibility.value,
+                    organization: resourceData.organization.value,
 
-                if(!duplicate) {
-                    let newResource = new resourceSchema({
-                        guildId: resourceData.guildId,
-                        name: resourceData.name,
-                        description: resourceData.description,
-                        url: resourceData.url,
-                        thumbnail: resourceData.thumbnail,
-                        image: resourceData.image,
-                        type: resourceData.GetTypeArray(),
-                        region: resourceData.GetRegionArray(),
-                        openHours: resourceData.openHours.value,
-                        phoneNumber: resourceData.phoneNumber.value,
-                        address: resourceData.address.value,
-                        email: resourceData.email.value,
-                        eligibility: resourceData.eligibility.value,
-                        organization: resourceData.organization.value,
+                }).save()
 
-                    }).save()
-
-                    let resourceTypes = await resourceTypeSchema.findOne({guildId: resourceData.guildId})
-                    resourceData.GetTypeArray().forEach(type => {
-                        for(let i = 0; i < resourceTypes.types.length; i++) {
-                            if(resourceTypes.types[i].name == type) {
-                                resourceTypes.types[i].number++
+                if(resourceData.organization.value != originalData.organization.value){
+                    if(originalData.HasOrganization()) {
+                        let oldOrganization = await organizationSchema.findOne({name: originalData.organization.value})
+                        for(let i = 0; oldOrganization.resources.length; i++) {
+                            if(oldOrganization.resources[i] == resourceData.name) {
+                                oldOrganization.resources.splice(i, 1)
                             }
                         }
-                    });
-
-                    let regionTypes = await regionSchema.findOne({guildId: resourceData.guildId})
-                    resourceData.GetRegionArray().forEach(region => {
-                        for(let i = 0; i < regionTypes.regions.length; i++) {
-                            if(regionTypes.regions[i].name == region){
-                                regionTypes.regions[i].resourceNumber++
-                            }
-                        }
-                    })
-
-                    resourceTypes.save()
-                    regionTypes.save()
+                    }
 
                     let organization = await organizationSchema.findOne({name: resourceData.organization.value})
                     if(typeof organization.resources == 'undefined') {
@@ -1366,64 +1369,20 @@ async function submit(resourceData: ResourceData, interaction: ButtonInteraction
 
                     organization.resources.push(resourceData.name)
                     organization.save()
-
-                    let loosend = await btnInt.reply({
-                        content: 'Saved!',
-                        fetchReply: true
-                    });
-
-                    (loosend as Message).delete();
-                    
-                    (mainMsg as Message).edit({
-                        content: 'Sumbitted.',
-                        components: [],
-                        embeds: []
-                    })
-                } else {
-                    const row = new MessageActionRow()
-                        .addComponents(
-                            new MessageButton()
-                                .setCustomId('tryAgain')
-                                .setLabel('Try Again')
-                                .setStyle('SUCCESS'),
-
-                            new MessageButton()
-                                .setCustomId('cancel')
-                                .setLabel('Cancel')
-                                .setStyle('DANGER')
-                        )
-
-                    let tryAgainMsg = await btnInt.reply({
-                        content: 'It seems like there is another resource with this name. Has someone already submitted this?',
-                        components: [row],
-                        fetchReply: true
-                    })
-
-                    messageArray.push(tryAgainMsg as Message);
-
-                    let tryAgainCollector = (tryAgainMsg as Message).createMessageComponentCollector({
-                        max: 1
-                    })
-
-                    tryAgainCollector.on('collect', async (btnInt: ButtonInteraction) => {
-                        if(btnInt.customId === 'tryAgain') {
-                            createResourceRec(btnInt, resourceData, messageArray)
-                        } else {
-                            messageArray.forEach(async message => {
-                                message.delete()
-                            });
-            
-                            let loosend = await btnInt.reply({
-                                content: 'Canceled...',
-                                fetchReply: true
-                            })
-            
-                            setTimeout(() => {}, 2000);
-            
-                            (loosend as Message).delete()
-                        }
-                    })
                 }
+
+                let loosend = await btnInt.reply({
+                    content: 'Saved!',
+                    fetchReply: true
+                });
+
+                (loosend as Message).delete();
+                
+                (mainMsg as Message).edit({
+                    content: 'Sumbitted.',
+                    components: [],
+                    embeds: []
+                })
             }
         } else {
             messageArray.forEach(async message => {

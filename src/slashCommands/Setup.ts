@@ -400,7 +400,9 @@ async function createRegion(interaction: ButtonInteraction) {
 
                 regionTypes.regions.push({
                     name: region,
-                    roleId: regionRole.id
+                    roleId: regionRole.id,
+                    resourceNumber: 0,
+                    restaurantNumber: 0,
                 })
 
                 regionTypes.save()

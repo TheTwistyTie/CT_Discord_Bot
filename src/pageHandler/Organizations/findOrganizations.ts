@@ -29,7 +29,7 @@ export default async (interaction : ButtonInteraction): Promise<void> => {
     let tagOptions = []
     for(let i = 0; i < typeList.types.length; i++) {
         tagOptions.push({
-            label: typeList.types[i].name + ` (${typeList.types[i].number})`,
+            label: typeList.types[i].name,
             value: typeList.types[i].name
         })
     }
@@ -38,7 +38,7 @@ export default async (interaction : ButtonInteraction): Promise<void> => {
     let regionOptions = []
     for(let i = 0; i < regionList.regions.length; i++) {
         regionOptions.push({
-            label: regionList.regions[i].name + ` (${regionList.regions[i].resourceNumber})`,
+            label: regionList.regions[i].name,
             value: regionList.regions[i].name
         })
     }

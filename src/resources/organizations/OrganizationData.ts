@@ -263,6 +263,13 @@ export default class OrganizatoinData {
         return true;
     }
 
+    HasResources(): boolean {
+        if(this.resources.length == 0) {
+            return false
+        }
+        return true;
+    }
+
     GetType(): {name: string, value: string, inline: boolean} {
         let label = 'Tags:'
 

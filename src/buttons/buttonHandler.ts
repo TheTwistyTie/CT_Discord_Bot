@@ -22,6 +22,7 @@ export default (interaction: ButtonInteraction, commandName: string): void => {
         case 'organizations':
             organizations(interaction)
             break;
-            
+        case 'providers':
+            break;
     }
 }

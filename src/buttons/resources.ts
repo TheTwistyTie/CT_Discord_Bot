@@ -80,10 +80,10 @@ async function hasSaved(user: User) {
         userData = new userSchema({
             id: user.id,
             name: user.username,
-        })
+        }).save()
     }
 
-    if(userData.savedResources.length > 0) {
+    if(userData.savedResources.length > 1) {
         return true;
     } else {
         return false;

@@ -419,14 +419,6 @@ export default class ResourceData {
         }
 
         let fields = []
-        if(this.HasType()) {
-            fields.push(this.GetType())
-        }
-
-        if(this.HasRegions()) {
-            fields.push(this.GetRegion())
-        }
-
         if(this.HasOpenHours()) {
             fields.push(this.openHours)
         }
@@ -449,6 +441,14 @@ export default class ResourceData {
 
         if(this.HasOrganization()) {
             fields.push(this.organization)
+        }
+
+        if(this.HasType()) {
+            fields.push(this.GetType())
+        }
+
+        if(this.HasRegions()) {
+            fields.push(this.GetRegion())
         }
 
         embed.addFields(fields)

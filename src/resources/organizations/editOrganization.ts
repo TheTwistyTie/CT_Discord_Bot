@@ -4,7 +4,7 @@ import organizationSchema from "../../schema/organization-schema"
 import addType from "./addType"
 import OrganizationData from "./OrganizationData"
 import regionSchema from "../../schema/region-schema"
-import resourceSchema from "src/schema/resource-schema"
+import resourceSchema from "../../schema/resource-schema"
 
 let originalData: OrganizationData
 
@@ -777,7 +777,7 @@ async function addOpenHours(resourceData: OrganizationData, interaction: ButtonI
     const { channel } = interaction;
 
     const mainMsg = await interaction.reply({
-        content: 'When is this restaurant open?\n\t*Press (Shift + Enter) for a new line.\n\tPress (Enter) to submit.*',
+        content: 'When is this organization open?\n\t*Press (Shift + Enter) for a new line.\n\tPress (Enter) to submit.*',
         fetchReply: true,
     })
 
@@ -830,7 +830,7 @@ async function addOpenHours(resourceData: OrganizationData, interaction: ButtonI
 
 async function addPhoneNumber(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {
     const mainMsg = await interaction.reply({
-        content: 'What is the phone number you want your restaurant to have?',
+        content: 'What is the phone number you want your organization to have?',
         fetchReply: true,
     })
 

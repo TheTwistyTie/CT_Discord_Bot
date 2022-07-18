@@ -1,27 +1,27 @@
 import { ButtonInteraction, Message, MessageActionRow, MessageButton, Role, RoleManager, User } from "discord.js"
-import savedOrganizations from "../pageHandler/Organizations/savedOrganizations"
-import findOrganizations from "../pageHandler/Organizations/findOrganizations"
-import addOrganization from "../resources/organizations/addOrganization"
+import savedProviders from "../pageHandler/Providers/savedProviders"
+import findProviders from "../pageHandler/Providers/findProviders"
+import addProvider from "../resources/providers/addProvider"
 import guildIdSchema from "../schema/guildId-schema"
 import userSchema from "../schema/user-schema"
 
 export default async (interaction: ButtonInteraction): Promise<void> => {
     const row = new MessageActionRow()
     const findButton = new MessageButton()
-    .setCustomId('find')
-    .setLabel('Find new organizations!')
-    .setStyle('PRIMARY')
+        .setCustomId('find')
+        .setLabel('Find new resources!')
+        .setStyle('PRIMARY')
     
     let savedButton;
     if(await hasSaved(interaction.user)) {
         savedButton = new MessageButton()
         .setCustomId('saved')
-        .setLabel('View saved oragnaizations!')
+        .setLabel('View saved resources!')
         .setStyle('PRIMARY')
     } else {
         savedButton = new MessageButton()
         .setCustomId('saved')
-        .setLabel('View saved oragnizations!')
+        .setLabel('View saved resources!')
         .setStyle('SECONDARY')
         .setDisabled(true)
     }
@@ -36,7 +36,7 @@ export default async (interaction: ButtonInteraction): Promise<void> => {
         row.addComponents(
             new MessageButton()
                 .setCustomId('add')
-                .setLabel('Add new organization')
+                .setLabel('Add new provider')
                 .setStyle('PRIMARY')
         )
     }
@@ -55,20 +55,22 @@ export default async (interaction: ButtonInteraction): Promise<void> => {
         let content = ''
         switch(customId){
             case 'find':
-                content = 'Finding Organizations!\nCheck your DM\'s'
-                findOrganizations(i)
+                findProviders(i);
+                content = 'Finding provider!\nCheck your DM\'s'
                 break;
             case 'saved':
-                content = 'Viewing Saved Organizations!\nCheck your DM\'s'
-                savedOrganizations(i)
+                savedProviders(i);
+                content = 'Viewing saved providers!\nCheck your DM\'s'
                 break;
             case 'add':
-                content = 'Adding an Organization!\nCheck your DM\'s'
-                addOrganization(i)
+                addProvider(i)
+                content = 'Adding provider!\nCheck your DM\'s'
                 break;
         }
+
         let loosend = await i.reply({content: content, fetchReply: true})
         setTimeout(() => {(loosend as Message).delete()}, 2000);
+        
     })
 }
 
@@ -81,7 +83,7 @@ async function hasSaved(user: User) {
         }).save()
     }
 
-    if(userData.savedResources.length > 0) {
+    if(userData.savedResources.length > 1) {
         return true;
     } else {
         return false;

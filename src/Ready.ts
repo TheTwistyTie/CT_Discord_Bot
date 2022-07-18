@@ -22,7 +22,7 @@ export default (client: Client) => {
             console.log(err)
         })
 
-        const testingGuildId = '979023303916265562'
+        const testingGuildId = '787693265977344010'
         const testingGuild = client.guilds.cache.get(testingGuildId)
         let commands
     
@@ -35,17 +35,17 @@ export default (client: Client) => {
         commands?.create({
             name: 'ping',
             description: 'Replies with Pong!'
-        })
+        });
 
         commands?.create({
             name: 'spawn',
             description: 'Spawns in the control panel. Do not use.'
-        })
+        });
 
         commands.create({
             name: 'setup',
             description: 'Set up a new server to a defaulted template.'
-        })
+        });
     
         console.log(`${client.user.username} is ready`);
     });

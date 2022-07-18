@@ -1,93 +1,26 @@
 import { ButtonInteraction, Guild, Message, MessageActionRow, MessageButton, MessageEmbed, MessageSelectMenu, SelectMenuInteraction } from "discord.js"
-import organizationTypeSchema from "../../schema/organizationType-schema"
-import organizationSchema from "../../schema/organization-schema"
+import providerTypeSchema from "../../schema/providerType-schema"
+import providerSchema from "../../schema/provider-schema"
 import addType from "./addType"
-import OrganizationData from "./OrganizationData"
+import ProviderData from "./ProviderData"
 import regionSchema from "../../schema/region-schema"
+import guildIdSchema from "../../schema/guildId-schema"
+import organizationSchema from "../../schema/organization-schema"
 
-export default async (interaction:ButtonInteraction) => {
-    const {guild, user} = interaction
-    const guildId = guild?.id || ''
+let originalData: ProviderData
 
-    const initialMessage = await user.send({
-        content: 'Thanks for adding something to our system!\nWhat is the name?',
-    })
+export default async (interaction:ButtonInteraction, resourceData: ProviderData) => {
+    originalData = resourceData;
 
-    const channel = initialMessage.channel;
-
-    const nameCollector = await channel.createMessageCollector({
-        max: 1,
-        time: 60000
-    })
-
-    nameCollector.on('collect',async (resourceName: Message) => {
-        const row = new MessageActionRow()
-            .addComponents(
-                new MessageButton()
-                    .setCustomId('confirm')
-                    .setLabel('Confirm')
-                    .setStyle('SUCCESS'),
-
-                new MessageButton()
-                    .setCustomId('cancel')
-                    .setLabel('Cancel')
-                    .setStyle('DANGER')
-            )
-
-        const confMessage = await channel.send({
-            content: `We received: '${resourceName.content}'`,
-            components: [row]
-        })
-
-        const confCollector = confMessage.createMessageComponentCollector()
-
-        confCollector.on('collect', async (btnInt: ButtonInteraction) => {
-            if(btnInt.customId === 'confirm') {
-                createResource(btnInt, resourceName.content, guildId)
-            } else {
-                let looseEnd = await btnInt.reply({
-                    content: 'Cancled.',
-                    fetchReply: true
-                })
-
-                setTimeout(() => {}, 2000);
-
-                (looseEnd as Message).delete()
-            }
-
-            confMessage.delete();
-            initialMessage.delete();
-        })
-    })
+    let messageArray: Message[] = []
+    createResourceRec(interaction, resourceData, messageArray)
 }
 
-async function createResource(interaction: ButtonInteraction, name: string, guild: string) {
-    const organizationData = new OrganizationData(name, guild);
-    const messageArray: Message[] = []
-
-    const startMessage = await interaction.reply({
-        content: `Tell us more about ${name}`,
-        embeds: [organizationData.BuildFullEmbed()],
-        components: makeMessageActionRow(organizationData),
-        fetchReply: true
-    })
-
-    messageArray.push(startMessage as Message)
-
-    const collector = (startMessage as Message).createMessageComponentCollector({
-        max: 1
-    })
-
-    collector.on('collect', async (btnInt: ButtonInteraction) => {
-        Action(btnInt, organizationData, messageArray)
-    })
-}
-
-export async function createResourceRec(interaction: ButtonInteraction, resourceData: OrganizationData, messageArray: Message[]) {
+export async function createResourceRec(interaction: ButtonInteraction, resourceData: ProviderData, messageArray: Message[]) {
     const startMessage = await interaction.reply({
         content: `Tell us more about ${resourceData.name}`,
         embeds: [resourceData.BuildFullEmbed()],
-        components: makeMessageActionRow(resourceData),
+        components: await makeMessageActionRow(resourceData),
         fetchReply: true
     })
 
@@ -102,7 +35,7 @@ export async function createResourceRec(interaction: ButtonInteraction, resource
     })
 }
 
-async function Action(btnInt: ButtonInteraction, resourceData: OrganizationData, messageArray: Message[]) {
+async function Action(btnInt: ButtonInteraction, resourceData: ProviderData, messageArray: Message[]) {
     switch(btnInt.customId) {
         case 'change_name':
             changeName(resourceData, btnInt, messageArray)
@@ -140,8 +73,14 @@ async function Action(btnInt: ButtonInteraction, resourceData: OrganizationData,
         case 'add_eligibility':
             addEligibility(resourceData, btnInt, messageArray)
             break;
+        case 'add_organization':
+            addOrganization(resourceData, btnInt, messageArray)
+            break;
         case 'submit':
             submit(resourceData, btnInt, messageArray)
+            break;
+        case 'delete':
+            deleteResource(resourceData, btnInt, messageArray)
             break;
         case 'cancel':
             messageArray.forEach(async message => {
@@ -160,11 +99,26 @@ async function Action(btnInt: ButtonInteraction, resourceData: OrganizationData,
     }
 }
 
-function makeMessageActionRow(resourceData: OrganizationData): MessageActionRow[] {
+async function makeMessageActionRow(resourceData: ProviderData): Promise<MessageActionRow[]> {
+    let organizationButton
+    
+    if(!resourceData.HasOrganization()) {
+        organizationButton = new MessageButton()
+        .setCustomId('add_organization')
+        .setLabel('Add linked organization')
+        .setStyle('PRIMARY')
+    } else {
+        organizationButton = new MessageButton()
+        .setCustomId('add_organization')
+        .setLabel('Change linked organization')
+        .setStyle('SECONDARY')
+    }
+
     let nameButton = new MessageButton()
         .setCustomId('change_name')
         .setLabel('Change Name')
         .setStyle('SECONDARY')
+        .setDisabled(true)
 
     let descriptionButton;
     if(resourceData.HasDescription()){
@@ -185,11 +139,13 @@ function makeMessageActionRow(resourceData: OrganizationData): MessageActionRow[
             .setCustomId('add_type')
             .setLabel('Add resource types')
             .setStyle('SECONDARY')
+            .setDisabled(true)
     } else {
         typeButton = new MessageButton()
             .setCustomId('add_type')
             .setLabel('Add resource types')
             .setStyle('PRIMARY')
+            .setDisabled(true)
     }
 
     let regionButton
@@ -198,16 +154,23 @@ function makeMessageActionRow(resourceData: OrganizationData): MessageActionRow[
             .setCustomId('add_region')
             .setLabel('Add resource regions')
             .setStyle('SECONDARY')
+            .setDisabled(true)
     } else {
         regionButton = new MessageButton()
             .setCustomId('add_region')
             .setLabel('Add resource regions')
             .setStyle('PRIMARY')
+            .setDisabled(true)
     }
 
-    const firstRow = new MessageActionRow()
-        .addComponents(
-            nameButton,
+    const firstRow = new MessageActionRow
+
+    let guildDB = await guildIdSchema.findOne({guildId: resourceData.guildId})
+    if(guildDB.resources.organizations){
+        firstRow.addComponents(organizationButton)
+    }
+
+    firstRow.addComponents(
             descriptionButton,
             typeButton,
             regionButton
@@ -229,12 +192,12 @@ function makeMessageActionRow(resourceData: OrganizationData): MessageActionRow[
     let thumbnailButton;
     if(!resourceData.HasThumbnail()) {
         thumbnailButton = new MessageButton()
-            .setLabel('Add a logo')
+            .setLabel('Add a picture')
             .setCustomId('add_thumbnail')
             .setStyle('SECONDARY')
     } else {
         thumbnailButton = new MessageButton()
-            .setLabel('Change the thumbnail')
+            .setLabel('Change the picture')
             .setCustomId('add_thumbnail')
             .setStyle('SECONDARY')
     }
@@ -280,11 +243,12 @@ function makeMessageActionRow(resourceData: OrganizationData): MessageActionRow[
 
     const secondRow = new MessageActionRow()
         .addComponents(
+            nameButton,
             urlButton,
             thumbnailButton,
-            imageButton,
+            //imageButton,
             openHoursButton,
-            phoneNumberButton
+            
         )
 
     let addressButton;
@@ -328,9 +292,10 @@ function makeMessageActionRow(resourceData: OrganizationData): MessageActionRow[
 
     const thirdRow = new MessageActionRow()
             .addComponents(
+                phoneNumberButton,
                 addressButton,
                 emailButton,
-                //eligibilityButton,
+                eligibilityButton,
             )
 
     let submitButton;
@@ -352,16 +317,22 @@ function makeMessageActionRow(resourceData: OrganizationData): MessageActionRow[
         .setLabel('Cancel')
         .setStyle('DANGER')
 
+    const deleteButton = new MessageButton()
+        .setCustomId('delete')
+        .setLabel('Delete Resource')
+        .setStyle('DANGER')
+
     const finalRow = new MessageActionRow()
         .addComponents(
             submitButton,
+            deleteButton,
             cancelButton
         )
 
     return [firstRow, secondRow, thirdRow, finalRow]
 }
 
-async function changeName(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {
+async function changeName(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
     const { channel } = interaction;
 
     const mainMessage = await interaction.reply({
@@ -422,7 +393,7 @@ async function changeName(resourceData: OrganizationData, interaction: ButtonInt
     })
 }
 
-async function changeDescription(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {
+async function changeDescription(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
     const { channel } = interaction;
 
     const mainMessage = await interaction.reply({
@@ -483,15 +454,15 @@ async function changeDescription(resourceData: OrganizationData, interaction: Bu
     })
 }
 
-async function addTypes(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {
-    let resouceTypes = await organizationTypeSchema.findOne({guildId: resourceData.guildId})
+async function addTypes(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
+    let resouceTypes = await providerTypeSchema.findOne({guildId: resourceData.guildId})
 
     let options = [{
-        label: 'Add new type of organization',
+        label: 'Add new type of provider',
         value: 'add_new'
     }];
     if(!resouceTypes) {
-        resouceTypes = new organizationTypeSchema({
+        resouceTypes = new providerTypeSchema({
             guildId: resourceData.guildId,
         })
     } else {
@@ -507,13 +478,13 @@ async function addTypes(resourceData: OrganizationData, interaction: ButtonInter
         .addComponents(
             new MessageSelectMenu()
                 .setCustomId('resource_type')
-                .setPlaceholder('Select what type of organization this is.')
+                .setPlaceholder('Select what type of provider this is.')
                 .setOptions(options)
                 .setMinValues(1)
         )
 
     const resourceMsg = await interaction.reply({
-        content: 'What kind of organization is this?',
+        content: 'What kind of provider is this?',
         components: [row],
         fetchReply: true
     })
@@ -567,7 +538,7 @@ async function addTypes(resourceData: OrganizationData, interaction: ButtonInter
     })
 }
 
-async function addRegion(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {
+async function addRegion(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
     let regionDB = await regionSchema.findOne({guildId: resourceData.guildId});
     
     if(!regionDB) {
@@ -592,7 +563,7 @@ async function addRegion(resourceData: OrganizationData, interaction: ButtonInte
             )
     
         const regionMsg = await interaction.reply({
-            content: 'What region(s) is this restaurant in?',
+            content: 'What region(s) is this resource in?',
             components: [row],
             fetchReply: true
         })
@@ -645,7 +616,7 @@ async function addRegion(resourceData: OrganizationData, interaction: ButtonInte
     }
 }
 
-async function changeUrl(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {
+async function changeUrl(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
     const { channel } = interaction;
 
     const mainMsg = await interaction.reply({
@@ -704,11 +675,11 @@ async function changeUrl(resourceData: OrganizationData, interaction: ButtonInte
     })
 }
 
-async function changeThumbnail(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {
+async function changeThumbnail(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
     const { channel } = interaction;
 
     const mainMsg = await interaction.reply({
-        content: 'What is the thumbnail you\'d like to have? You can either paste a link directly to the image or upload your own!',
+        content: 'What is the picture you\'d like to have? You can either paste a link directly to the image or upload your own!',
         fetchReply: true,
     })
 
@@ -770,7 +741,7 @@ async function changeThumbnail(resourceData: OrganizationData, interaction: Butt
     })
 }
 
-async function changeImage(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {
+async function changeImage(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
     const { channel } = interaction;
 
     const mainMsg = await interaction.reply({
@@ -836,11 +807,11 @@ async function changeImage(resourceData: OrganizationData, interaction: ButtonIn
     })
 }
 
-async function addOpenHours(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {    
+async function addOpenHours(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {    
     const { channel } = interaction;
 
     const mainMsg = await interaction.reply({
-        content: 'When is this organization open?\n\t*Press (Shift + Enter) for a new line.\n\tPress (Enter) to submit.*',
+        content: 'When is this provider planning on being online?\n\t*Press (Shift + Enter) for a new line.\n\tPress (Enter) to submit.*',
         fetchReply: true,
     })
 
@@ -891,9 +862,9 @@ async function addOpenHours(resourceData: OrganizationData, interaction: ButtonI
     })
 }
 
-async function addPhoneNumber(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {
+async function addPhoneNumber(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
     const mainMsg = await interaction.reply({
-        content: 'What is the phone number you want your organization to have?',
+        content: 'What is the phone number you want your provider to have?',
         fetchReply: true,
     })
 
@@ -985,9 +956,9 @@ function validNumber(string: string) {
     return tester.test(string);
 }
 
-async function addAddress(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {
+async function addAddress(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
     const mainMsg = await interaction.reply({
-        content: 'What is the address you want your organization to have?\n\t*Press (Shift + Enter) for a new line.\n\tPress (Enter) to submit.*',
+        content: 'What is the address you want your provider to have?\n\t*Press (Shift + Enter) for a new line.\n\tPress (Enter) to submit.*',
         fetchReply: true,
     })
 
@@ -1038,11 +1009,11 @@ async function addAddress(resourceData: OrganizationData, interaction: ButtonInt
     })
 }
 
-async function addEmail(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {
+async function addEmail(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
     const { channel } = interaction;
 
     const mainMsg = await interaction.reply({
-        content: 'What is the email you want your organization to have?',
+        content: 'What is the email you want your resource to have?',
         fetchReply: true,
     })
 
@@ -1136,11 +1107,11 @@ function validEmail(email: string): boolean {
     return false
 };
 
-async function addEligibility(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {
+async function addEligibility(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
     const { channel } = interaction;
 
     const mainMsg = await interaction.reply({
-        content: 'What requirements must someone meet in order to be eligible for this resource?\n\t*Press (Shift + Enter) for a new line.\n\tPress (Enter) to submit.*',
+        content: 'What requirements must someone meet in order to be eligible for this provider\'s help?\n\t*Press (Shift + Enter) for a new line.\n\tPress (Enter) to submit.*',
         fetchReply: true,
     })
 
@@ -1178,7 +1149,7 @@ async function addEligibility(resourceData: OrganizationData, interaction: Butto
                     content: 'Confimed',
                     components: [],
                 })
-                //resourceData.SetEligibility(eligibility)
+                resourceData.SetEligibility(eligibility)
             } else {
                 interaction.editReply({
                     content: 'Canceled',
@@ -1191,7 +1162,136 @@ async function addEligibility(resourceData: OrganizationData, interaction: Butto
     })
 }
 
-async function submit(resourceData: OrganizationData, interaction: ButtonInteraction, messageArray: Message[]) {
+async function addOrganization(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
+    let organizationList = await organizationSchema.find({guildId: resourceData.guildId});
+    let organizationOptionList: {label: string, value: string}[] = []
+
+    for(let i = 0; i < organizationList.length; i++) {
+        organizationOptionList.push({label: organizationList[i].name, value: organizationList[i].name})
+    }
+
+    const organizationSelectMenu = new MessageSelectMenu()
+        .setCustomId('orgSelect')
+        .setPlaceholder('Select an Organization')
+        .addOptions(organizationOptionList)
+        .setMinValues(0)
+
+    const orgActionRow = new MessageActionRow()
+        .addComponents(organizationSelectMenu)
+
+    let selectMsg = await interaction.reply({
+        content: 'Select an organization to link to.',
+        components: [orgActionRow],
+        fetchReply: true
+    })
+
+    let collector = (selectMsg as Message).createMessageComponentCollector({
+        max: 1
+    })
+
+    collector.on('collect', async (selectInt: SelectMenuInteraction) => {
+        const value = selectInt.values[0]
+
+        const row = new MessageActionRow()
+            .addComponents(
+                new MessageButton()
+                    .setCustomId('continue')
+                    .setLabel('Continue')
+                    .setStyle('SUCCESS'),
+                new MessageButton()
+                    .setCustomId('cancel')
+                    .setLabel('Cancel')
+                    .setStyle('DANGER')
+            )
+
+        let confMsg = await selectInt.reply({
+            content: 'Received: ' + value,
+            components: [row],
+            fetchReply: true
+        })
+
+        let confCollector = (confMsg as Message).createMessageComponentCollector({max: 1})
+
+        confCollector.on('collect', (confInt: ButtonInteraction) => {
+            if(confInt.customId == 'continue') {
+                resourceData.SetOrganization(value)
+            }
+
+            createResourceRec(confInt, resourceData, messageArray)
+        })
+    })
+}
+
+async function deleteResource(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
+    const { channel } = interaction
+
+    const row = new MessageActionRow()
+        .addComponents(
+            new MessageButton()
+                .setCustomId('cancel')
+                .setLabel('Cancel')
+                .setStyle('SECONDARY'),
+            new MessageButton()
+                .setCustomId('deleteResource')
+                .setLabel('Delete')
+                .setStyle('DANGER')
+        )
+
+    const mainMsg = await interaction.reply({
+        content: 'Are you sure that you want to delete this resource?',
+        components: [row],
+        embeds: [resourceData.BuildFullEmbed()],
+        fetchReply: true,
+    })
+
+    messageArray.push(mainMsg as Message)
+
+    const confConllector = (mainMsg as Message).createMessageComponentCollector({
+        max: 1,
+    })
+
+    confConllector.on('collect',async (btnInt: ButtonInteraction) => {
+        let text = ''
+        if(btnInt.customId === 'deleteResource') {
+            const resources = await providerSchema.find({guildId: resourceData.guildId})
+
+            if(resources) {
+                for(let i = 0; i < resources.length; i++) {
+                    if(resources[i].name == resourceData.name) {
+                        resources[i].delete()
+                    }
+                }
+
+                if(resourceData.HasOrganization()) {
+                    let organization = await organizationSchema.findOne({name: resourceData.organization.value})
+                    for(let i = 0; i < organization.providers.length; i++) {
+                        if(organization.providers[i] == resourceData.name) {
+                            organization.providers.splice(i, 1)
+                        }
+                    }
+
+                    organization.save()
+                }
+            }
+            text = 'Deleted.'
+
+            
+        } else {
+            text = 'Cancled.'
+        }
+
+        let looseEnd = await btnInt.reply({
+            content: text,
+            fetchReply: true
+        })
+
+        setTimeout(() => {
+            (looseEnd as Message).delete()
+        }, 2000)
+    })
+}
+
+async function submit(resourceData: ProviderData, interaction: ButtonInteraction, messageArray: Message[]) {
     const { channel } = interaction
 
     const row = new MessageActionRow()
@@ -1207,7 +1307,7 @@ async function submit(resourceData: OrganizationData, interaction: ButtonInterac
         )
 
     const mainMsg = await interaction.reply({
-        content: 'Are you sure that you want to submit this organization?',
+        content: 'Are you sure that you want to submit this resource?',
         components: [row],
         embeds: [resourceData.BuildFullEmbed()],
         fetchReply: true,
@@ -1223,112 +1323,64 @@ async function submit(resourceData: OrganizationData, interaction: ButtonInterac
         if(btnInt.customId === 'continue') {
             //btnInt.deferReply()
 
-            const resources = await organizationSchema.find({guildId: resourceData.guildId})
+            const resources = await providerSchema.find({guildId: resourceData.guildId})
 
             if(resources) {
-                let duplicate = false
-                resources.forEach(resource => {
-                    if(resource.name == resourceData.name) {
-                        duplicate = true;
+                for(let i = 0; i < resources.length; i++) {
+                    if(resources[i].name == resourceData.name) {
+                        resources.splice(i, 1)
                     }
+                }
+                
+                let newResource = new providerSchema({
+                    guildId: resourceData.guildId,
+                    name: resourceData.name,
+                    description: resourceData.description,
+                    url: resourceData.url,
+                    thumbnail: resourceData.thumbnail,
+                    image: resourceData.image,
+                    type: resourceData.GetTypeArray(),
+                    region: resourceData.GetRegionArray(),
+                    openHours: resourceData.openHours.value,
+                    phoneNumber: resourceData.phoneNumber.value,
+                    address: resourceData.address.value,
+                    email: resourceData.email.value,
+                    eligibility: resourceData.eligibility.value,
+                    organization: resourceData.organization.value,
+
+                }).save()
+
+                if(resourceData.organization.value != originalData.organization.value){
+                    if(originalData.HasOrganization()) {
+                        let oldOrganization = await organizationSchema.findOne({name: originalData.organization.value})
+                        for(let i = 0; oldOrganization.providers.length; i++) {
+                            if(oldOrganization.providers[i] == resourceData.name) {
+                                oldOrganization.providers.splice(i, 1)
+                            }
+                        }
+                    }
+
+                    let organization = await organizationSchema.findOne({name: resourceData.organization.value})
+                    if(typeof organization.providers == 'undefined') {
+                        organization.providers = []
+                    }
+
+                    organization.providers.push(resourceData.name)
+                    organization.save()
+                }
+
+                let loosend = await btnInt.reply({
+                    content: 'Saved!',
+                    fetchReply: true
                 });
 
-                if(!duplicate) {
-                    let newResource = new organizationSchema({
-                        guildId: resourceData.guildId,
-                        name: resourceData.name,
-                        description: resourceData.description,
-                        url: resourceData.url,
-                        thumbnail: resourceData.thumbnail,
-                        image: resourceData.image,
-                        type: resourceData.GetTypeArray(),
-                        region: resourceData.GetRegionArray(),
-                        openHours: resourceData.openHours.value,
-                        phoneNumber: resourceData.phoneNumber.value,
-                        address: resourceData.address.value,
-                        email: resourceData.email.value,
-                        //eligibility: resourceData.eligibility.value,
-
-                    }).save()
-
-                    let resourceTypes = await organizationTypeSchema.findOne({guildId: resourceData.guildId})
-                    resourceData.GetTypeArray().forEach(type => {
-                        for(let i = 0; i < resourceTypes.types.length; i++) {
-                            if(resourceTypes.types[i].name == type) {
-                                resourceTypes.types[i].number++
-                            }
-                        }
-                    });
-
-                    let regionTypes = await regionSchema.findOne({guildId: resourceData.guildId})
-                    resourceData.GetRegionArray().forEach(region => {
-                        for(let i = 0; i < regionTypes.regions.length; i++) {
-                            if(regionTypes.regions[i].name == region){
-                                regionTypes.regions[i].resourceNumber++
-                            }
-                        }
-                    })
-
-                    resourceTypes.save()
-                    regionTypes.save()
-
-                    let loosend = await btnInt.reply({
-                        content: 'Saved!',
-                        fetchReply: true
-                    });
-
-                    (loosend as Message).delete();
-                    
-                    (mainMsg as Message).edit({
-                        content: 'Sumbitted.',
-                        components: [],
-                        embeds: []
-                    })
-                } else {
-                    const row = new MessageActionRow()
-                        .addComponents(
-                            new MessageButton()
-                                .setCustomId('tryAgain')
-                                .setLabel('Try Again')
-                                .setStyle('SUCCESS'),
-
-                            new MessageButton()
-                                .setCustomId('cancel')
-                                .setLabel('Cancel')
-                                .setStyle('DANGER')
-                        )
-
-                    let tryAgainMsg = await btnInt.reply({
-                        content: 'It seems like there is another organization with this name. Has someone already submitted this?',
-                        components: [row],
-                        fetchReply: true
-                    })
-
-                    messageArray.push(tryAgainMsg as Message);
-
-                    let tryAgainCollector = (tryAgainMsg as Message).createMessageComponentCollector({
-                        max: 1
-                    })
-
-                    tryAgainCollector.on('collect', async (btnInt: ButtonInteraction) => {
-                        if(btnInt.customId === 'tryAgain') {
-                            createResourceRec(btnInt, resourceData, messageArray)
-                        } else {
-                            messageArray.forEach(async message => {
-                                message.delete()
-                            });
-            
-                            let loosend = await btnInt.reply({
-                                content: 'Canceled...',
-                                fetchReply: true
-                            })
-            
-                            setTimeout(() => {}, 2000);
-            
-                            (loosend as Message).delete()
-                        }
-                    })
-                }
+                (loosend as Message).delete();
+                
+                (mainMsg as Message).edit({
+                    content: 'Sumbitted.',
+                    components: [],
+                    embeds: []
+                })
             }
         } else {
             messageArray.forEach(async message => {

@@ -9,7 +9,8 @@ const schema = new mongoose.Schema({
     },
     savedResources: [],
     savedOrganizations: [],
-    savedRestaurants: []
+    savedRestaurants: [],
+    savedProviders: [],
 })
 
 export default mongoose.model('user', schema)

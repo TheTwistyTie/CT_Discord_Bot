@@ -1,15 +1,13 @@
-import { BaseCommandInteraction, ButtonInteraction, DMChannel, Guild, Message, MessageActionRow, MessageButton, MessageEmbed, MessageSelectMenu, TextChannel, User } from "discord.js";
+import { ButtonInteraction, DMChannel, Guild, Message, MessageActionRow, MessageButton, MessageEmbed, TextChannel, User } from "discord.js";
 import userSchema from "../../schema/user-schema";
+import ProviderData from "../../resources/providers/ProviderData";
+import organizationSchema from "../../schema/organization-schema";
 import OrganizationData from "../../resources/organizations/OrganizationData";
-import resourceSchema from "../../schema/resource-schema";
-import ResourceData from "../../resources/resources/ResourceData";
 import guildIdSchema from "../../schema/guildId-schema";
-import editOrganization from "../../resources/organizations/editOrganization";
-import providerSchema from "../../schema/provider-schema";
-import ProviderData from "../../resources/providers/ProviderData"
+import editResource from "../../resources/providers/editProvider";
 
-export default class OrganizationObject {
-    data: OrganizationData;
+export default class ProviderObject {
+    data: ProviderData;
     guild: Guild;
     userID: string;
     userName: string;
@@ -19,9 +17,9 @@ export default class OrganizationObject {
 
     viewFull: boolean
     #isSaved = false;
-    #viewingResourceEmbed = false;
+    #showingOrganization = false;
 
-    constructor(embedData: OrganizationData, guild: Guild, userID: string, userName: string) {
+    constructor(embedData: ProviderData, guild: Guild, userID: string, userName: string) {
         this.data = embedData;
         this.guild = guild;
         this.userID = userID
@@ -40,52 +38,36 @@ export default class OrganizationObject {
         this.message = await channel.send({
             content: this.data.name + ':',
             embeds: [this.data.BuildEmbed()],
-            components: await this.getComponents()
+            components: await this.getComponents(userId)
         })
 
         const btnCollector = (this.message as Message).createMessageComponentCollector();
 
-        btnCollector.on('collect', async (interaction: BaseCommandInteraction) => {
-            if(interaction.isButton()) {
-                switch(interaction.customId) {
-                    case 'rate':
-                        this.rate(interaction)
-                        break;
-                    case 'toggleFull':
-                        this.toggleFullEmbed()
-    
-                        this.interactionReply(interaction)
-                        break;
-                    case 'save':
-                        this.save()
-    
-                        this.interactionReply(interaction)
-                        break;
-                    case 'returnToOrg':
-                        this.returnToOrg()
+        btnCollector.on('collect', async (btnInt: ButtonInteraction) => {
+            let looseEnd
+            switch(btnInt.customId) {
+                case 'rate':
+                    this.rate(btnInt)
+                    break;
+                case 'toggleFull':
+                    this.toggleFullEmbed()
 
-                        this.interactionReply(interaction)
-                        break;
-                    case 'edit':
-                        editOrganization(interaction, this.data)
-                        break;
-                }
+                    this.interactionReply(btnInt)
+                    break;
+                case 'save':
+                    this.save()
+
+                    this.interactionReply(btnInt)
+                    break;
+                case 'seeOrg':
+                    this.showOrganziation()
+
+                    this.interactionReply(btnInt)
+                    break;
+                case 'edit':
+                    editResource(btnInt, this.data)
+                    break;
             }
-            
-            if(interaction.isSelectMenu()) {
-                let value = interaction.values[0]
-                switch(interaction.customId) {
-                    case 'resourceSelect': 
-                        this.viewResource(value)
-                        this.interactionReply(interaction)
-                        break;
-                    case 'providerSelect':
-                        this.interactionReply(interaction)
-                        break;
-                }
-                
-            }
-            
         })
     }
 
@@ -100,24 +82,37 @@ export default class OrganizationObject {
         this.refreshMessage()
     }
 
-    async getComponents(): Promise<MessageActionRow[]> {
-        let returnArray = []
+    async getComponents(userId: string): Promise<MessageActionRow[]> {
         let row = new MessageActionRow()
-
         let toggle;
+        let saveButton;
+        let rate;
+        let seeOrgButton
+
+        if(this.#showingOrganization) {
+            seeOrgButton = new MessageButton()
+            .setCustomId('seeOrg')
+            .setStyle('PRIMARY')
+            .setLabel('See resource')
+        } else {
+            seeOrgButton = new MessageButton()
+            .setCustomId('seeOrg')
+            .setStyle('PRIMARY')
+            .setLabel('See linked organization')
+        }
+
         if(this.viewFull) {
             toggle = new MessageButton()
                 .setCustomId('toggleFull')
                 .setStyle('PRIMARY')
-                .setLabel('Show Less')
+                .setLabel('Show less')
         } else {
             toggle = new MessageButton()
                 .setCustomId('toggleFull')
                 .setStyle('PRIMARY')
-                .setLabel('Show More')
+                .setLabel('Show more')
         }
-
-        let saveButton;
+        
         if(this.#isSaved){
             saveButton = new MessageButton()
                 .setCustomId('save')
@@ -130,77 +125,44 @@ export default class OrganizationObject {
                 .setLabel('Save')
         }
 
-        let rate = new MessageButton()
+        rate = new MessageButton()
             .setCustomId('rate')
             .setStyle('SUCCESS')
             .setLabel(`Rate (${this.data.ratings.length})`)
-
-        let resourceButton = new MessageButton()
-            .setCustomId('returnToOrg')
-            .setStyle('PRIMARY')
-            .setLabel('Return to organization')
 
         let editButton = new MessageButton()
             .setCustomId('edit')
             .setStyle('DANGER')
             .setLabel('Edit or delete')
 
-        if(this.#viewingResourceEmbed) {
-            row.addComponents(resourceButton)
+        if(this.data.HasOrganization()) {
+            if(this.#showingOrganization) {
+                row.addComponents(seeOrgButton)
+            } else {
+                row.addComponents(
+                    seeOrgButton,
+                    toggle,
+                    rate,
+                    saveButton,
+                )
+
+                if(await this.canAddNew(userId)) {
+                    row.addComponents(editButton)
+                }
+            }
         } else {
             row.addComponents(
                 toggle,
                 rate,
-                saveButton
+                saveButton,
             )
 
-            if(await this.canAddNew(this.userID)) {
+            if(await this.canAddNew(userId)) {
                 row.addComponents(editButton)
             }
-        }
+        }         
 
-        returnArray.push(row)
-        
-        if(this.data.resources.length > 0) {
-            let options: {label: string, value: string}[] = []
-
-            for(let i = 0; i < this.data.resources.length; i++) {
-                options.push({
-                    value: this.data.resources[i],
-                    label: this.data.resources[i]
-                })
-            }
-
-            let selectMenu = new MessageSelectMenu()
-                .setCustomId('resourceSelect')
-                .setPlaceholder('View resources from this organization')
-                .addOptions(options)
-
-            let selectRow = new MessageActionRow().addComponents(selectMenu)
-            returnArray.push(selectRow)
-        }
-
-        if(this.data.providers.length > 0) {
-            let options: {label: string, value: string}[] = []
-
-            for(let i = 0; i < this.data.providers.length; i++) {
-                options.push({
-                    value: this.data.providers[i],
-                    label: this.data.providers[i]
-                })
-            }
-
-            let selectMenu = new MessageSelectMenu()
-                .setCustomId('providerSelect')
-                .setPlaceholder('View providers from this organization')
-                .addOptions(options)
-
-            let selectRow = new MessageActionRow().addComponents(selectMenu)
-            returnArray.push(selectRow)
-        }
-
-
-        return returnArray        
+        return [row]
     }
 
     async rate(interaction: ButtonInteraction) {
@@ -341,7 +303,7 @@ export default class OrganizationObject {
         return row
     }
 
-    interactionReply(interaction: BaseCommandInteraction) {
+    interactionReply(interaction: ButtonInteraction) {
         interaction.reply({
             content: 'Button Clicked',
             fetchReply: true,
@@ -358,7 +320,7 @@ export default class OrganizationObject {
 
     async refreshMessage() {
         (this.message as Message).edit({
-            components: await this.getComponents(),
+            components: await this.getComponents(this.userID),
             embeds: [this.embed]
         })
     }
@@ -371,8 +333,8 @@ export default class OrganizationObject {
             return false
         }
         
-        for (let i = 0; i < userDB.savedOrganizations.length; i++) {
-            if(userDB.savedOrganizations[i] == this.data.name){
+        for (let i = 0; i < userDB.savedResources.length; i++) {
+            if(userDB.savedResources[i] == this.data.name){
                 this.#isSaved = true
                 return true
             }
@@ -401,17 +363,17 @@ export default class OrganizationObject {
         let found = false;
         let i = 0;
 
-        while(i < userDB.savedOrganizations.length && !found) {
-            if(userDB.savedOrganizations[i] == this.data.name) {
+        while(i < userDB.savedResources.length && !found) {
+            if(userDB.savedResources[i] == this.data.name) {
                 found = true;
                 this.#isSaved = false
-                userDB.savedOrganizations.splice(i, 1)
+                userDB.savedResources.splice(i, 1)
             }
             i++
         }
 
         if(!found) {
-            userDB.savedOrganizations.push(this.data.name)
+            userDB.savedResources.push(this.data.name)
             this.#isSaved = true
         }
 
@@ -419,32 +381,21 @@ export default class OrganizationObject {
         this.refreshMessage()
     }
 
-    async viewResource(name: string) {
-        let resource = await resourceSchema.findOne({name: name});
+    async showOrganziation() {
+        if(this.#showingOrganization) {
+            this.#showingOrganization = false;
+            this.viewFull = true
+            this.embed = this.data.BuildFullEmbed()
+        } else {
+            let organization = await organizationSchema.findOne({name: this.data.GetOrganization()})
 
-        let resourceData = new ResourceData(resource.name, this.guild.id)
-        resourceData.SetData(resource)
+            let orgData = new OrganizationData(organization.name, this.guild.id)
+            orgData.SetData(organization)
 
-        this.embed = resourceData.BuildFullEmbed()
-        this.#viewingResourceEmbed = true;
-        this.refreshMessage()
-    }
+            this.embed = orgData.BuildFullEmbed()
+            this.#showingOrganization = true;
+        }
 
-    async viewProvider(name: string) {
-        let provider = await providerSchema.findOne({name: name});
-
-        let providerData = new ProviderData(provider.name, this.guild.id)
-        providerData.SetData(provider)
-
-        this.embed = providerData.BuildFullEmbed()
-        this.#viewingResourceEmbed = true;
-        this.refreshMessage()
-    }
-
-    returnToOrg() {
-        this.embed = this.data.BuildFullEmbed()
-        this.#viewingResourceEmbed = false;
-        this.viewFull = true
         this.refreshMessage()
     }
 

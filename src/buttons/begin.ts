@@ -25,7 +25,8 @@ async function makeRow(guildId: any) : Promise<MessageActionRow[]> {
     if(configConnection) {
         let resoUse = false;
         let orgUse = false;
-        let restUse = false
+        let restUse = false;
+        let provUse = false;
 
         if(configConnection.resources.resources) {
             resoUse = true
@@ -37,6 +38,10 @@ async function makeRow(guildId: any) : Promise<MessageActionRow[]> {
 
         if(configConnection.resources.restaurants) {
             restUse = true
+        }
+
+        if(configConnection.resources.providers) {
+            provUse = true
         }
 
         if(resoUse) {
@@ -62,6 +67,15 @@ async function makeRow(guildId: any) : Promise<MessageActionRow[]> {
                 new MessageButton()
                     .setCustomId('restaurants')
                     .setLabel('Find Restaurants')
+                    .setStyle('PRIMARY')
+            )
+        }
+
+        if(provUse) {
+            row.addComponents(
+                new MessageButton()
+                    .setCustomId('providers')
+                    .setLabel('Find Providers')
                     .setStyle('PRIMARY')
             )
         }

@@ -1,11 +1,11 @@
 import { ButtonInteraction, Message, MessageActionRow, MessageButton, SelectMenuInteraction } from "discord.js";
-import ResourceData from "./ResourceData";
-import {createResourceRec} from "./addResource"
-import resourceTypeSchema from "../../schema/resourceType-schema";
+import ProviderData from "./ProviderData";
+import {createResourceRec} from "./addProvider"
+import providerTypeSchema from "../../schema/providerType-schema";
 
-export default async (interaction: SelectMenuInteraction, resourceData: ResourceData, messageArray: Message[]) => {
+export default async (interaction: SelectMenuInteraction, providerData: ProviderData, messageArray: Message[]) => {
     const msg = await interaction.reply({
-        content: 'What new category of resource would you like to add?',
+        content: 'What new category of provider would you like to add?',
         fetchReply: true
     })
 
@@ -36,11 +36,11 @@ export default async (interaction: SelectMenuInteraction, resourceData: Resource
         })
 
         confCollector.on('collect', async (btnInt: ButtonInteraction) => {
-            let resourceTypes = await resourceTypeSchema.findOne({guildId: resourceData.guildId})
+            let resourceTypes = await providerTypeSchema.findOne({guildId: providerData.guildId})
 
             if(!resourceTypes) {
-                resourceTypes = new resourceTypeSchema({
-                    guildId: resourceData.guildId,
+                resourceTypes = new providerTypeSchema({
+                    guildId: providerData.guildId,
                     types: [{
                         name: value,
                         number: 0
@@ -57,7 +57,7 @@ export default async (interaction: SelectMenuInteraction, resourceData: Resource
 
             
 
-            createResourceRec(btnInt, resourceData, messageArray)
+            createResourceRec(btnInt, providerData, messageArray)
         })
     })
 

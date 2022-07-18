@@ -1,8 +1,8 @@
 import { ColorResolvable, MessageEmbed } from "discord.js";
 import { get } from "mongoose";
-import organizationSchema from "../../schema/organization-schema";
+import providerSchema from "../../schema/provider-schema";
 
-export default class OrganizatoinData {
+export default class ResourceData {
     name: string;
     guildId: string;
     description: string = 'Default Description'
@@ -12,8 +12,6 @@ export default class OrganizatoinData {
 
     type: string[] = []
     region: string[] = []
-    resources: string[] = []
-    providers: string[] = []
 
     ratings: [{
         userId: string,
@@ -44,6 +42,18 @@ export default class OrganizatoinData {
         inline: false,
     }
 
+    eligibility = {
+        name: 'Eligibility:',
+        value: 'unset',
+        inline: false,
+    }
+
+    organization = {
+        name: 'Organization:',
+        value: 'unset',
+        inline: true,
+    }
+
     constructor(name: string, guildId: string) {
         this.name = name;
         this.guildId = guildId
@@ -62,12 +72,12 @@ export default class OrganizatoinData {
         phoneNumber: string,
         address: string,
         email: string,
+        eligibility: string,
         ratings: [{
             userId: string,
             rating: number
         }],
-        resources: string[],
-        providers: string[],
+        organization: string,
     }): void {
         this.name = data.name
         this.guildId = data.guildId
@@ -82,8 +92,8 @@ export default class OrganizatoinData {
         this.phoneNumber.value = data.phoneNumber
         this.address.value = data.address
         this.email.value = data.email
-        this.resources = data.resources
-        this.providers = data.providers
+        this.eligibility.value = data.eligibility
+        this.organization.value = data.organization
     }
 
     SetType(nType: string): void {
@@ -175,8 +185,16 @@ export default class OrganizatoinData {
         this.email.value = value;
     }
 
+    SetEligibility(value: string): void {
+        this.eligibility.value = value
+    }
+
     SetImage(value: string): void {
         this.image = value
+    }
+
+    SetOrganization(value: string): void {
+        this.organization.value = value
     }
 
     AddRating(value: {userId: string, rating: number}): void {
@@ -266,11 +284,18 @@ export default class OrganizatoinData {
         return true;
     }
 
-    HasResources(): boolean {
-        if(this.resources.length == 0) {
+    HasEligibility(): boolean {
+        if(this.eligibility.value == 'unset' || typeof this.eligibility.value == 'undefined') {
             return false
         }
         return true;
+    }
+
+    HasOrganization(): boolean{
+        if(this.organization.value == 'unset' || typeof this.organization.value == 'undefined') {
+            return false
+        }
+        return true
     }
 
     GetType(): {name: string, value: string, inline: boolean} {
@@ -371,6 +396,10 @@ export default class OrganizatoinData {
         return embed
     }
 
+    GetOrganization(): string {
+        return this.organization.value
+    }
+
     BuildFullEmbed(): MessageEmbed {
         const embed = new MessageEmbed()
             .setTitle(this.name)
@@ -406,6 +435,14 @@ export default class OrganizatoinData {
             fields.push(this.email)
         }
 
+        if(this.HasEligibility()) {
+            fields.push(this.eligibility)
+        }
+
+        if(this.HasOrganization()) {
+            fields.push(this.organization)
+        }
+
         if(this.HasType()) {
             fields.push(this.GetType())
         }
@@ -438,7 +475,7 @@ export default class OrganizatoinData {
             })
         }
 
-        let dbConnection = await organizationSchema.findOne({name: this.name})
+        let dbConnection = await providerSchema.findOne({name: this.name})
         if(dbConnection) {
             dbConnection.ratings = this.ratings;
             dbConnection.save()

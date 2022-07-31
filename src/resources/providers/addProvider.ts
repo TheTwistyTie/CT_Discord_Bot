@@ -942,8 +942,8 @@ async function addPhoneNumber(resourceData: ProviderData, interaction: ButtonInt
                     .setStyle('DANGER')
             )
 
-        let isNumber = await validNumber(number);
-        //let isNumber = true;
+        //let isNumber = await validNumber(number);
+        let isNumber = true;
 
         if(isNumber){       
 

@@ -81,6 +81,7 @@ export default async (interaction: BaseCommandInteraction): Promise<void> => {
                 resources: false,
                 organizations: false,
                 restaurants: false,
+                providers: false,
             }
         }).save()
 
@@ -140,9 +141,13 @@ async function resources(interaction : ButtonInteraction) {
             value: 'organizations'
         },
         {
+            label: 'Providers',
+            value: 'providers'
+        },
+        {
             label: 'Restaurants',
             value: 'restaurants'
-        },
+        },        
     ]
 
     const row = new MessageActionRow()
@@ -166,9 +171,6 @@ async function resources(interaction : ButtonInteraction) {
         const resources = selectInt.values;
         let dbConnection = await guildIdSchema.findOne({guildId: interaction.guild?.id})
 
-        console.log(dbConnection)
-        console.log(resources)
-
         let resourceNames: string[] = []
 
         resources.forEach(resource => {
@@ -185,12 +187,13 @@ async function resources(interaction : ButtonInteraction) {
                     dbConnection.resources.restaurants = !dbConnection.resources.restaurants
                     resourceNames.push('restaurants')
                     break;
+                case 'providers':
+                    dbConnection.resources.providers = !dbConnection.resources.providers
+                    resourceNames.push('providers')
             }
         });
 
         dbConnection.save()
-
-        console.log(resourceNames)
 
         let content: string
         if(resourceNames.length <= 1) {

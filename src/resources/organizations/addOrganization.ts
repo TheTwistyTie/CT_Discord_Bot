@@ -330,7 +330,7 @@ function makeMessageActionRow(resourceData: OrganizationData): MessageActionRow[
             .addComponents(
                 addressButton,
                 emailButton,
-                //eligibilityButton,
+                eligibilityButton,
             )
 
     let submitButton;
@@ -916,8 +916,8 @@ async function addPhoneNumber(resourceData: OrganizationData, interaction: Butto
                     .setStyle('DANGER')
             )
 
-        let isNumber = await validNumber(number);
-        //let isNumber = true;
+        //let isNumber = await validNumber(number);
+        let isNumber = true;
 
         if(isNumber){       
 
@@ -1178,7 +1178,7 @@ async function addEligibility(resourceData: OrganizationData, interaction: Butto
                     content: 'Confimed',
                     components: [],
                 })
-                //resourceData.SetEligibility(eligibility)
+                resourceData.SetEligibility(eligibility)
             } else {
                 interaction.editReply({
                     content: 'Canceled',
@@ -1247,7 +1247,7 @@ async function submit(resourceData: OrganizationData, interaction: ButtonInterac
                         phoneNumber: resourceData.phoneNumber.value,
                         address: resourceData.address.value,
                         email: resourceData.email.value,
-                        //eligibility: resourceData.eligibility.value,
+                        eligibility: resourceData.eligibility.value,
 
                     }).save()
 

@@ -49,7 +49,7 @@ const schema = new mongoose.Schema({
         resources: Boolean,
         organizations: Boolean,
         restaurants: Boolean,
-        provider: Boolean
+        providers: Boolean
     }
 })
 

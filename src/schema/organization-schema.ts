@@ -44,7 +44,9 @@ const schema = new mongoose.Schema({
     address: String,
     email: String,
     resources: [],
-    providers: []
+    providers: [],
+    eligibility: String,
+    
 })
 
 export default mongoose.model('organization', schema)

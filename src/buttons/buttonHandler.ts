@@ -1,6 +1,7 @@
 import { BaseCommandInteraction, ButtonInteraction } from "discord.js";
 import begin from "./begin";
 import organizations from "./organizations";
+import providers from "./providers";
 import resources from "./resources";
 import restaurants from "./restaurants";
 import roles from "./roles";
@@ -23,6 +24,7 @@ export default (interaction: ButtonInteraction, commandName: string): void => {
             organizations(interaction)
             break;
         case 'providers':
+            providers(interaction)
             break;
     }
 }

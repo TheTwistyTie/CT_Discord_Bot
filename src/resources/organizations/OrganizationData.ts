@@ -44,6 +44,12 @@ export default class OrganizatoinData {
         inline: false,
     }
 
+    eligibility = {
+        name: 'Eligibility:',
+        value: 'unset',
+        inline: false,
+    }
+
     constructor(name: string, guildId: string) {
         this.name = name;
         this.guildId = guildId
@@ -68,6 +74,7 @@ export default class OrganizatoinData {
         }],
         resources: string[],
         providers: string[],
+        eligibility: string,
     }): void {
         this.name = data.name
         this.guildId = data.guildId
@@ -84,6 +91,7 @@ export default class OrganizatoinData {
         this.email.value = data.email
         this.resources = data.resources
         this.providers = data.providers
+        this.eligibility.value = data.eligibility
     }
 
     SetType(nType: string): void {
@@ -179,6 +187,10 @@ export default class OrganizatoinData {
         this.image = value
     }
 
+    SetEligibility(value: string): void {
+        this.eligibility.value = value;
+    }
+
     AddRating(value: {userId: string, rating: number}): void {
         this.ratings.push(value)
     }
@@ -271,6 +283,13 @@ export default class OrganizatoinData {
             return false
         }
         return true;
+    }
+
+    HasEligibility(): boolean {
+        if(this.eligibility.value == 'unset' || typeof this.email.value == 'undefined') {
+            return false
+        }
+        return true
     }
 
     GetType(): {name: string, value: string, inline: boolean} {
@@ -392,6 +411,10 @@ export default class OrganizatoinData {
         let fields = []
         if(this.HasOpenHours()) {
             fields.push(this.openHours)
+        }
+
+        if(this.HasEligibility()) {
+            fields.push(this.eligibility)
         }
 
         if(this.HasPhoneNumber()) {
